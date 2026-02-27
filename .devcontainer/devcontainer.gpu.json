@@ -1,6 +1,6 @@
 {
-  "name": "Hackathon Agent Dev (CPU)",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "name": "Hackathon Agent Dev (GPU)",
+  "image": "mcr.microsoft.com/devcontainers/cuda:12-cudnn-devel-ubuntu22.04",
   "features": {
     "ghcr.io/devcontainers/features/python:1": {
       "version": "3.11"
@@ -27,5 +27,8 @@
         "ms-toolsai.jupyter"
       ]
     }
+  },
+  "hostRequirements": {
+    "gpu": true
   }
 }
