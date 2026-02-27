@@ -10,7 +10,7 @@ GPU-accelerated agentic AI prototyping environment for the Mistral Hackathon NYC
 
 1. Click **Open in GitHub Codespaces** above (or go to **Code → Codespaces → Create**).
 2. Select a **GPU machine type** (A100 recommended; hackathon quota may apply).
-3. The devcontainer automatically installs CUDA 12, Python 3.11, W&B, and all dependencies.
+3. The devcontainer automatically installs CUDA 12, Python 3.11, W&B, and all dependencies. A startup bootstrap script re-checks `uv` and project dependencies each time the Codespace starts so tools remain available after restarts.
 4. Set your secrets in your GitHub settings (**Repository Settings → Codespaces → Repository secrets** or **User Settings → Codespaces → Secrets**) so they are available in your Codespace:
 
    | Secret | Description |
