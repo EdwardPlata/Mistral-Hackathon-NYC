@@ -29,7 +29,7 @@ GPU-accelerated agentic AI prototyping environment for the Mistral Hackathon NYC
 | **NVIDIA Agent Toolkit** | `git clone https://github.com/NVIDIA/NeMo-Agent-Toolkit.git && cd NeMo-Agent-Toolkit && uv sync --all-groups` | GPU agents in minutes; swap Mistral models via YAML |
 | **Weights & Biases** | `wandb login` (key auto-loaded from secret) | Auto-track experiments; share dashboards |
 | **ElevenLabs Voice** | `elevenlabs text-to-speech` (key auto-loaded from secret) | Streaming TTS; <1s latency via Codespace GPU |
-| **HuggingFace / Mistral** | `huggingface-cli login` then `autotrain llm --train --model mistralai/Mistral-7B-v0.1` | Fine-tune & push to Hub in 10–30 minutes |
+| **HuggingFace / Mistral** | `uv add "huggingface_hub[cli]>=0.23.0" && huggingface-cli login` then `autotrain llm --train --model mistralai/Mistral-7B-v0.1` | Fine-tune & push to Hub in 10–30 minutes |
 
 ---
 
