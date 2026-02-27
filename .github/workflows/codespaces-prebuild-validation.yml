@@ -1,0 +1,40 @@
+name: Codespaces Prebuild Validation
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    paths:
+      - '.devcontainer/devcontainer.json'
+      - '.devcontainer/setup.sh'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'requirements.txt'
+      - 'requirements-dev.txt'
+  workflow_dispatch:
+
+jobs:
+  prebuild-readiness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate dependency pre-resolution step used by Codespaces prebuilds
+        shell: bash
+        run: |
+          bash .devcontainer/setup.sh
+
+      - name: Verify dependency fingerprint was updated
+        shell: bash
+        run: |
+          test -f .devcontainer/.dependency-fingerprint
