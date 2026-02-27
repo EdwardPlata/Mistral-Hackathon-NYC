@@ -2,7 +2,7 @@
 
 ## Startup expectations with prebuilds
 
-Codespaces prebuilds are configured for the default branch (`main`) and high-traffic branches (`develop`, `release/**`) so dependency installation happens before developers launch a Codespace. The `.devcontainer/setup.sh` script now fingerprints `devcontainer.json` and dependency files and runs `uv sync --extra langchain --extra dev` during prebuild/update when those inputs change.
+Codespaces prebuilds are configured for the default branch (`main`) and high-traffic branches (`develop`, `release/**`) so dependency installation happens before developers launch a Codespace. The `.devcontainer/setup.sh` script now fingerprints `devcontainer.json` (default CPU) or `devcontainer.gpu.json` (opt-in GPU) and dependency files and runs `uv sync --extra langchain --extra dev` during prebuild/update when those inputs change.
 
 In a healthy prebuild path, first open should mostly skip dependency resolution and land in a ready-to-code state.
 

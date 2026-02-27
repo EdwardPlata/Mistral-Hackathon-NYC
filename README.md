@@ -1,6 +1,6 @@
 # Mistral Hackathon NYC
 
-GPU-accelerated agentic AI prototyping environment for the Mistral Hackathon NYC, integrating NVIDIA Agent Toolkit, Weights & Biases, ElevenLabs, and HuggingFace/Mistral.
+Agentic AI prototyping environment for the Mistral Hackathon NYC, integrating NVIDIA Agent Toolkit, Weights & Biases, ElevenLabs, and HuggingFace/Mistral.
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/EdwardPlata/Mistral-Hackathon-NYC?quickstart=1)
 
@@ -9,8 +9,8 @@ GPU-accelerated agentic AI prototyping environment for the Mistral Hackathon NYC
 ## Codespaces Quick Setup (2–5 mins)
 
 1. Click **Open in GitHub Codespaces** above (or go to **Code → Codespaces → Create**).
-2. Select a **GPU machine type** (A100 recommended; hackathon quota may apply).
-3. The devcontainer automatically installs CUDA 12, Python 3.11, and a fast default dependency set (core + dev tooling). A startup bootstrap script re-checks `uv` and project dependencies each time the Codespace starts so tools remain available after restarts.
+2. Use the default **CPU-first** container for normal coding tasks (faster startup, works on standard hosts).
+3. The default devcontainer automatically installs Python 3.11 and a fast default dependency set (core + dev tooling). A startup bootstrap script re-checks `uv` and project dependencies each time the Codespace starts so tools remain available after restarts.
 4. (Optional) Install heavy ML/GPU dependencies only when needed:
 
    ```bash
@@ -25,6 +25,26 @@ GPU-accelerated agentic AI prototyping environment for the Mistral Hackathon NYC
    | `WANDB_API_KEY` | Weights & Biases API key |
    | `ELEVENLABS_API_KEY` | ElevenLabs TTS API key |
    | `HF_TOKEN` | HuggingFace access token |
+
+### CPU vs GPU Dev Container Selection
+
+- **CPU container (default):** use `.devcontainer/devcontainer.json` for editing, prompt work, docs, tests, and most Python development.
+- **GPU container (opt-in):** use `.devcontainer/devcontainer.gpu.json` only for local CUDA workloads that truly need a GPU-enabled host.
+
+Use one of these explicit launch paths:
+
+```bash
+# Codespaces (default CPU container)
+https://codespaces.new/EdwardPlata/Mistral-Hackathon-NYC?quickstart=1
+
+# Codespaces (opt-in GPU container)
+https://codespaces.new/EdwardPlata/Mistral-Hackathon-NYC?quickstart=1&devcontainer_path=.devcontainer/devcontainer.gpu.json
+```
+
+In VS Code Dev Containers (local Docker/Desktop):
+
+1. Run **Dev Containers: Reopen in Container** for the default CPU setup.
+2. Run **Dev Containers: Open Folder in Container...** and choose `.devcontainer/devcontainer.gpu.json` when you specifically need CUDA.
 
 ---
 
@@ -131,7 +151,8 @@ uv remove some-package
 ```
 .
 ├── .devcontainer/
-│   ├── devcontainer.json      # Codespaces GPU config
+│   ├── devcontainer.json      # Default CPU-first devcontainer config
+│   ├── devcontainer.gpu.json  # Opt-in CUDA/GPU devcontainer config
 │   ├── setup.sh               # Fast default bootstrap install
 │   └── install-ml-extras.sh   # Optional heavyweight ML/GPU extras
 ├── pyproject.toml           # Project dependencies (UV-managed)
