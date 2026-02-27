@@ -1,0 +1,23 @@
+model:
+  provider: mistral
+  name: mistral-large-latest
+  endpoint: ${MISTRAL_ENDPOINT}
+  api_key: ${MISTRAL_API_KEY}
+
+tools:
+  nvidia_nemo:
+    enabled: true
+    api_key: ${NVIDIA_API_KEY}
+  huggingface:
+    enabled: true
+    token: ${HF_TOKEN}
+  elevenlabs:
+    enabled: true
+    api_key: ${ELEVENLABS_API_KEY}
+  wandb:
+    enabled: true
+    project: mistral-hackathon-nyc
+
+settings:
+  max_tokens: 2048
+  temperature: 0.6
