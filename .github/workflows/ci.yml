@@ -22,9 +22,13 @@ jobs:
           pip install uv
           uv sync --extra dev || pip install ".[dev]"
       - name: Lint
-        continue-on-error: true
         run: |
           uv run ruff check .
       - name: Run tests
         run: |
-          uv run pytest -q || echo "No tests yet"
+          if [ -d tests ] || find . -type f \( -name 'test_*.py' -o -name '*_test.py' \) -not -path './.venv/*' -print -quit | grep -q .; then
+            uv run pytest -q
+          else
+            echo "No tests found; skipping pytest."
+            exit 0
+          fi
