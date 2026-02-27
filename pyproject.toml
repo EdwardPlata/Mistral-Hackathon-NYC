@@ -31,6 +31,9 @@ dev = [
     "ruff>=0.4.0",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["agents"]
+
 [tool.uv.sources]
 torch = { index = "pytorch-cu121" }
 
