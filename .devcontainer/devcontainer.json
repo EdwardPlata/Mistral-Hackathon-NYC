@@ -6,7 +6,7 @@
     "ghcr.io/devcontainers-contrib/features/wandb:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "postCreateCommand": "pip install uv && uv sync && uv pip install -e '.[langchain]'",
+  "postCreateCommand": "pip install uv && uv sync --extra langchain --extra dev",
   "remoteEnv": {
     "NVIDIA_API_KEY": "${localEnv:NVIDIA_API_KEY}",
     "WANDB_API_KEY": "${localEnv:WANDB_API_KEY}",
