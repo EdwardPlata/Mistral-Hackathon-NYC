@@ -6,12 +6,12 @@
     "ghcr.io/devcontainers-contrib/features/wandb:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "postCreateCommand": "pip install uv && uv sync --extra langchain --extra dev",
+  "postCreateCommand": "python -m pip install uv && uv sync --extra langchain --extra dev",
   "remoteEnv": {
-    "NVIDIA_API_KEY": "${localEnv:NVIDIA_API_KEY}",
-    "WANDB_API_KEY": "${localEnv:WANDB_API_KEY}",
-    "ELEVENLABS_API_KEY": "${localEnv:ELEVENLABS_API_KEY}",
-    "HF_TOKEN": "${localEnv:HF_TOKEN}"
+    "NVIDIA_API_KEY": "${secrets:NVIDIA_API_KEY}",
+    "WANDB_API_KEY": "${secrets:WANDB_API_KEY}",
+    "ELEVENLABS_API_KEY": "${secrets:ELEVENLABS_API_KEY}",
+    "HF_TOKEN": "${secrets:HF_TOKEN}"
   },
   "customizations": {
     "vscode": {
@@ -24,6 +24,6 @@
     }
   },
   "hostRequirements": {
-    "gpu": "optional"
+    "gpu": true
   }
 }
