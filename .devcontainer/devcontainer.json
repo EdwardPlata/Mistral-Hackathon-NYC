@@ -1,0 +1,29 @@
+{
+  "name": "Hackathon Agent Dev",
+  "image": "mcr.microsoft.com/devcontainers/cuda:12-cudnn-devel-ubuntu22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
+    "ghcr.io/devcontainers-contrib/features/wandb:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "pip install uv && uv sync && uv pip install -e '.[langchain]'",
+  "remoteEnv": {
+    "NVIDIA_API_KEY": "${localEnv:NVIDIA_API_KEY}",
+    "WANDB_API_KEY": "${localEnv:WANDB_API_KEY}",
+    "ELEVENLABS_API_KEY": "${localEnv:ELEVENLABS_API_KEY}",
+    "HF_TOKEN": "${localEnv:HF_TOKEN}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "wandb.vscode-wandb",
+        "ms-toolsai.jupyter"
+      ]
+    }
+  },
+  "hostRequirements": {
+    "gpu": "optional"
+  }
+}
