@@ -4,3 +4,7 @@ __pycache__/
 *.egg-info/
 dist/
 .venv/
+skills/hf/
+skills/awesome-claude-skills/
+skills/Skill_Seekers/
+skills/vendor/

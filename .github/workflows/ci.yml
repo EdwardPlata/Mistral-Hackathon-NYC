@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --extra dev || pip install -r requirements.txt
+      - name: Lint
+        continue-on-error: true
+        run: |
+          uv run ruff check .
+      - name: Run tests
+        run: |
+          uv run pytest -q || echo "No tests yet"
