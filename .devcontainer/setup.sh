@@ -13,6 +13,7 @@ fi
 
 if [[ ! -f "${MARKER_FILE}" ]]; then
   cd "${WORKSPACE_DIR}"
-  uv sync --extra langchain --extra dev
+  # Fast startup path: install only core + development tooling.
+  uv sync --extra dev
   touch "${MARKER_FILE}"
 fi
