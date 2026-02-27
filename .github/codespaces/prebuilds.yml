@@ -1,0 +1,15 @@
+# Repository-level Codespaces prebuild policy.
+# Keep this list in sync with `.github/workflows/codespaces-prebuild-validation.yml`.
+default_branch: main
+high_traffic_branches:
+  - develop
+  - release/**
+
+# Changes to any of these files should trigger prebuild refreshes.
+prebuild_trigger_paths:
+  - .devcontainer/devcontainer.json
+  - .devcontainer/setup.sh
+  - pyproject.toml
+  - uv.lock
+  - requirements.txt
+  - requirements-dev.txt

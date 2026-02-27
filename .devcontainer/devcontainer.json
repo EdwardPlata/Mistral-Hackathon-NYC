@@ -9,6 +9,7 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
+  "updateContentCommand": "bash .devcontainer/setup.sh",
   "remoteEnv": {
     "NVIDIA_API_KEY": "${secrets:NVIDIA_API_KEY}",
     "WANDB_API_KEY": "${secrets:WANDB_API_KEY}",
@@ -29,6 +30,5 @@
   },
   "hostRequirements": {
     "gpu": true
-  },
-  "postStartCommand": "bash .devcontainer/setup.sh"
+  }
 }
