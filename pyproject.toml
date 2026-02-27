@@ -11,13 +11,6 @@ dependencies = [
     "mistralai>=1.0.0",
     "wandb>=0.17.0",
     "elevenlabs>=1.0.0",
-    "transformers>=4.40.0",
-    "datasets>=2.19.0",
-    "huggingface_hub>=0.23.0",
-    "torch>=2.3.0",
-    "accelerate>=0.30.0",
-    "peft>=0.10.0",
-    "trl>=0.8.6",
     "python-dotenv>=1.0.0",
 ]
 
@@ -25,6 +18,15 @@ dependencies = [
 langchain = [
     "langchain>=0.2.0",
     "langchain-mistralai>=0.1.0",
+]
+ml-gpu = [
+    "transformers>=4.40.0",
+    "datasets>=2.19.0",
+    "huggingface_hub>=0.23.0",
+    "torch>=2.3.0",
+    "accelerate>=0.30.0",
+    "peft>=0.10.0",
+    "trl>=0.8.6",
 ]
 dev = [
     "pytest>=8.0.0",
