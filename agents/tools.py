@@ -65,7 +65,7 @@ def elevenlabs_speak(text: str, voice_id: str = "Rachel", output_path: str = "/t
     Args:
         text: The text to synthesize.
         voice_id: ElevenLabs voice name or ID (default: "Rachel").
-        output_path: Destination file path for the audio (default: /tmp/output.mp3).
+        output_path: Destination file path for the audio.
 
     Returns:
         Path to the saved audio file.
@@ -74,7 +74,11 @@ def elevenlabs_speak(text: str, voice_id: str = "Rachel", output_path: str = "/t
 
     client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
     audio = client.text_to_speech.convert(text=text, voice_id=voice_id)
-    output_path = "/tmp/output.mp3"
+
+    parent_dir = os.path.dirname(output_path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
     save(audio, output_path)
     return output_path
 
