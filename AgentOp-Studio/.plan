@@ -1,0 +1,160 @@
+# AgentOp-Studio — Project Plan
+
+AgentOps Studio is an observability and experiment-tracking platform for
+Mistral-based AI agents. Every agent run (prompts, tool calls, token usage,
+costs) is persisted to DuckDB, queryable via a FastAPI backend, and
+visualised in a Streamlit dashboard with replay/diff capability.
+
+---
+
+## Directory Layout
+
+```
+AgentOp-Studio/
+├── agents/               ← Mistral agentic loop + tool definitions
+│   ├── __init__.py
+│   ├── main_agent.py     ← bare run_agent() loop (no instrumentation)
+│   ├── tools.py          ← wandb_log, hf_list_models, elevenlabs_speak
+│   └── config.yaml       ← model/tool config (env-var interpolated)
+├── backend/
+│   ├── __init__.py
+│   ├── main.py           ← FastAPI app (POST /run, POST /replay, GET /runs)
+│   ├── db.py             ← DuckDB schema + connection helper
+│   ├── instrumented_agent.py ← run_agent() with full observability
+│   ├── costs.py          ← Mistral token-cost estimator
+│   └── replay.py         ← replay_run() + unified-diff generation
+├── frontend/
+│   ├── __init__.py
+│   └── app.py            ← Streamlit dashboard (4 pages)
+├── infra/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── tests/
+│   ├── conftest.py
+│   ├── test_costs.py
+│   ├── test_replay.py
+│   └── test_db.py
+├── data/                 ← DuckDB file lives here (.gitkeep)
+├── .plan                 ← this file
+├── PROGRESS.md           ← per-feature completion tracker
+└── README.md             ← full architecture document
+```
+
+---
+
+## Phase 1 — Core Observability MVP  (target: complete)
+
+| # | Feature                    | Owner file(s)                          | Status |
+|---|----------------------------|----------------------------------------|--------|
+| 1 | DuckDB schema (6 tables)   | backend/db.py                          | done   |
+| 2 | Instrumented agent loop    | backend/instrumented_agent.py          | done   |
+| 3 | Token + cost tracking      | backend/costs.py, instrumented_agent   | done   |
+| 4 | FastAPI: POST /run         | backend/main.py                        | done   |
+| 5 | FastAPI: GET /runs[/{id}]  | backend/main.py                        | done   |
+| 6 | Replay & unified diff      | backend/replay.py, POST /replay        | done   |
+| 7 | Streamlit dashboard        | frontend/app.py                        | done   |
+| 8 | W&B metric logging (opt.)  | backend/instrumented_agent.py          | done   |
+| 9 | Docker / Compose           | infra/                                 | done   |
+|10 | Unit tests (19 total)      | tests/                                 | done   |
+
+**Phase 1 is complete.**  Run `uv run pytest AgentOp-Studio/tests/` to verify.
+
+---
+
+## Phase 2 — Integrations & Evaluation  (next up)
+
+| # | Feature                          | Target file(s)                         | Status  |
+|---|----------------------------------|----------------------------------------|---------|
+| 1 | Memory snapshot capture          | backend/instrumented_agent.py          | pending |
+| 2 | Memory viewer in dashboard       | frontend/app.py                        | pending |
+| 3 | Evaluation metric logging        | backend/main.py + new POST /eval       | pending |
+| 4 | Evaluation dashboard page        | frontend/app.py                        | pending |
+| 5 | HuggingFace leaderboard export   | backend/hf_export.py (new)             | pending |
+| 6 | ElevenLabs TTS cost tracking     | backend/costs.py extension             | pending |
+| 7 | W&B artifact upload (run data)   | backend/instrumented_agent.py          | pending |
+| 8 | Multi-agent run view             | backend/main.py, frontend/app.py       | pending |
+
+---
+
+## Phase 3 — Polish, Auth, CI/CD  (nice-to-have)
+
+| # | Feature                         | Notes                                   | Status  |
+|---|---------------------------------|-----------------------------------------|---------|
+| 1 | API key auth middleware         | FastAPI dependency                      | pending |
+| 2 | Role-based access control       | Pydantic user model                     | pending |
+| 3 | GitHub Actions CI               | lint + test on push                     | pending |
+| 4 | Cost spike alerts               | POST /alerts endpoint or W&B webhook    | pending |
+| 5 | Databricks/Airflow hooks        | Optional trigger integrations           | pending |
+| 6 | Kubernetes manifests            | infra/k8s/                              | pending |
+| 7 | Fine-tune loop automation       | Mistral fine-tuning API                 | pending |
+| 8 | On-device ONNX/TRT demo         | NVIDIA TensorRT inference               | pending |
+
+---
+
+## Runtime Environment Variables
+
+| Variable            | Default                  | Description                         |
+|---------------------|--------------------------|-------------------------------------|
+| `MISTRAL_API_KEY`   | (required)               | Mistral API authentication          |
+| `MISTRAL_MODEL`     | `mistral-large-latest`   | Model for agent runs                |
+| `MAX_TOKENS`        | `2048`                   | Max generation tokens per call      |
+| `TEMPERATURE`       | `0.6`                    | Sampling temperature                |
+| `AGENTOPS_DB_PATH`  | `data/agentops.duckdb`   | DuckDB file location                |
+| `AGENTOPS_API_URL`  | `http://localhost:8000`  | Frontend → backend URL              |
+| `WANDB_API_KEY`     | (optional)               | W&B logging — skipped if unset      |
+| `WANDB_PROJECT`     | `agentops-studio`        | W&B project name                    |
+| `HF_TOKEN`          | (optional)               | HuggingFace Hub token               |
+| `ELEVENLABS_API_KEY`| (optional)               | ElevenLabs TTS key                  |
+
+---
+
+## Running Locally
+
+```bash
+# Install dependencies (from repo root)
+uv sync --extra agentops
+
+# Set required env vars
+cp .env.example .env   # then fill in MISTRAL_API_KEY
+
+# Start backend (AgentOp-Studio/ must be on PYTHONPATH)
+PYTHONPATH=AgentOp-Studio uvicorn backend.main:app --reload
+
+# Start frontend (separate terminal)
+PYTHONPATH=AgentOp-Studio streamlit run AgentOp-Studio/frontend/app.py
+
+# Run tests
+uv run pytest AgentOp-Studio/tests/ -v
+```
+
+## Running with Docker Compose
+
+```bash
+cd AgentOp-Studio/infra
+docker compose up --build
+# Backend: http://localhost:8000/docs
+# Frontend: http://localhost:8501
+```
+
+---
+
+## Key Design Decisions
+
+1. **DuckDB over PostgreSQL** — zero-server, file-based, perfect for hackathon
+   demos; swap to Postgres by changing `DB_PATH` and connection string.
+
+2. **Separate `agents/` package** — the bare `run_agent()` in `agents/` has no
+   observability coupling; `backend/instrumented_agent.py` wraps it by re-using
+   the same Mistral call pattern so the two stay independently testable.
+
+3. **W&B logging is best-effort** — missing `WANDB_API_KEY` silently skips
+   logging so the app works out of the box without W&B credentials.
+
+4. **Env-var overrides for replay** — `replay_run()` temporarily patches
+   `os.environ` to honour `override_params`, then restores original values.
+   This is intentionally simple for single-process demo use.
+
+5. **PYTHONPATH strategy** — the `AgentOp-Studio/` directory name contains a
+   hyphen, making it invalid as a Python package identifier. Adding it to
+   `PYTHONPATH` lets `backend`, `agents`, and `frontend` all be importable as
+   top-level packages without renaming the directory.
