@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Suppress UV hardlink warnings in containerized environments
+export UV_LINK_MODE=copy
+
 WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MARKER_FILE="${WORKSPACE_DIR}/.devcontainer/.setup-complete"
 HASH_FILE="${WORKSPACE_DIR}/.devcontainer/.dependency-fingerprint"

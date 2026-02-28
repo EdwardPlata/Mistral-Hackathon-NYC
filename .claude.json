@@ -1,0 +1,42 @@
+{
+  "skills": [
+    {
+      "name": "deep-research",
+      "path": ".claude/deep-research.md",
+      "description": "Deep repository exploration and context building without modifying files",
+      "enabled": true
+    },
+    {
+      "name": "refactor-with-tests",
+      "path": ".claude/refactor-with-tests.md",
+      "description": "Test-first refactoring workflow with validation and rollback option",
+      "enabled": true
+    },
+    {
+      "name": "run-tests",
+      "path": ".claude/run-tests.md",
+      "description": "Fast, targeted test execution with actionable output",
+      "enabled": true
+    },
+    {
+      "name": "commit",
+      "path": ".claude/commit.md",
+      "description": "Safe git commit workflow with staged changes and confirmation",
+      "enabled": true
+    },
+    {
+      "name": "doc-sweep",
+      "path": ".claude/doc-sweep.md",
+      "description": "Generate or update documentation across multiple files",
+      "enabled": true
+    },
+    {
+      "name": "safe-reader",
+      "path": ".claude/safe-reader.md",
+      "description": "Read-only exploration mode with no file modifications or command execution",
+      "enabled": true
+    }
+  ],
+  "skillDiscoveryPaths": [".claude"],
+  "format": "claude-skills-v1"
+}
