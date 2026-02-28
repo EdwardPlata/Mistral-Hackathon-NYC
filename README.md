@@ -10,10 +10,13 @@ Agentic AI prototyping environment for the Mistral Hackathon NYC, integrating NV
 
 1. Click **Open in GitHub Codespaces** above (or go to **Code → Codespaces → Create**).
 2. Use the default **CPU-first** container for normal coding tasks (faster startup, works on standard hosts).
-3. The default devcontainer automatically installs Python 3.11 and a fast default dependency set (core + dev tooling). A startup bootstrap script re-checks `uv` and project dependencies each time the Codespace starts so tools remain available after restarts.
-4. (Optional) Install heavy ML/GPU dependencies only when needed:
+3. The default devcontainer installs Python 3.11 tooling only; project dependencies are installed manually when you run the setup script (so container build/deploy stays fast and reliable).
+4. Install the base project dependencies when you are ready:
 
    ```bash
+   bash .devcontainer/setup.sh
+
+   # Optional: install heavy ML/GPU dependencies only when needed
    .devcontainer/install-ml-extras.sh
    # (equivalent to: uv sync --extra dev --extra ml-gpu --extra langchain)
    ```

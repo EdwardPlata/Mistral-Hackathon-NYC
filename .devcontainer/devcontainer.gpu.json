@@ -5,11 +5,8 @@
     "ghcr.io/devcontainers/features/python:1": {
       "version": "3.11"
     },
-    "ghcr.io/devcontainers-contrib/features/wandb:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "postCreateCommand": "bash .devcontainer/setup.sh",
-  "updateContentCommand": "bash .devcontainer/setup.sh",
   "remoteEnv": {
     "NVIDIA_API_KEY": "${secrets:NVIDIA_API_KEY}",
     "WANDB_API_KEY": "${secrets:WANDB_API_KEY}",
@@ -30,5 +27,6 @@
   },
   "hostRequirements": {
     "gpu": true
-  }
+  },
+  "postAttachCommand": "echo 'Run bash .devcontainer/setup.sh to install project dependencies when you are ready.'"
 }
