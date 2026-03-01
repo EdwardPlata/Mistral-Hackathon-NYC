@@ -59,7 +59,7 @@ def _load_runs() -> pd.DataFrame:
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Run Agent", "Run Detail", "Replay & Diff"],
+    ["Dashboard", "Run Agent", "Run Detail", "Replay & Diff", "Evaluations"],
 )
 
 # ---------------------------------------------------------------------------
@@ -198,6 +198,131 @@ elif page == "Run Detail":
                     st.dataframe(tc_df, use_container_width=True)
                 else:
                     st.info("No tool calls for this run.")
+
+                st.divider()
+                st.subheader("Memory Snapshots")
+                try:
+                    snapshots = _get(f"/runs/{run_id}/memory")
+                    if snapshots:
+                        for i, snap in enumerate(snapshots, 1):
+                            with st.expander(
+                                f"Snapshot {i} — {snap.get('timestamp', '')}",
+                                expanded=False,
+                            ):
+                                import json as _snap_json
+                                try:
+                                    mem = _snap_json.loads(snap["memory_json"])
+                                    st.json(mem)
+                                except Exception:
+                                    st.text(snap["memory_json"])
+                    else:
+                        st.info("No memory snapshots for this run (snapshots are captured per tool-call round).")
+                except Exception as exc:
+                    st.error(f"Could not load memory snapshots: {exc}")
+
+                st.divider()
+                st.subheader("Evaluations")
+                try:
+                    evals = _get(f"/evals/{run_id}")
+                    if evals:
+                        eval_df = pd.DataFrame(evals)[["metric_name", "metric_value"]]
+                        st.dataframe(eval_df, use_container_width=True)
+                    else:
+                        st.info("No evaluations logged for this run.")
+                except Exception as exc:
+                    st.error(f"Could not load evaluations: {exc}")
+
+                st.divider()
+                st.subheader("Log Evaluation")
+                with st.form("eval_form"):
+                    metric_name = st.text_input("Metric name", placeholder="e.g. success, accuracy, latency_ok")
+                    metric_value = st.number_input("Metric value", value=1.0, step=0.01)
+                    submitted = st.form_submit_button("Log")
+                    if submitted:
+                        if not metric_name.strip():
+                            st.warning("Enter a metric name.")
+                        else:
+                            try:
+                                result = _post(
+                                    "/eval",
+                                    {"run_id": run_id, "metrics": {metric_name: metric_value}},
+                                )
+                                st.success(f"Logged: {metric_name} = {metric_value}")
+                            except Exception as exc:
+                                st.error(f"Failed to log: {exc}")
+
+# ---------------------------------------------------------------------------
+# Page: Replay & Diff
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Page: Evaluations
+# ---------------------------------------------------------------------------
+
+elif page == "Evaluations":
+    st.title("Evaluations")
+
+    try:
+        evals = _get("/evals")
+    except Exception as exc:
+        st.error(f"Could not reach backend: {exc}")
+        evals = []
+
+    if not evals:
+        st.info("No evaluations logged yet. Use **Run Detail** to log metrics for a run.")
+    else:
+        eval_df = pd.DataFrame(evals)
+
+        # Summary KPIs
+        unique_metrics = eval_df["metric_name"].nunique()
+        unique_runs = eval_df["run_id"].nunique()
+        c1, c2 = st.columns(2)
+        c1.metric("Metric Types", unique_metrics)
+        c2.metric("Runs Evaluated", unique_runs)
+
+        st.divider()
+
+        # Per-metric average bar chart
+        avg_df = eval_df.groupby("metric_name")["metric_value"].mean().reset_index()
+        avg_df.columns = ["metric_name", "avg_value"]
+        fig_avg = px.bar(
+            avg_df,
+            x="metric_name",
+            y="avg_value",
+            title="Average Value per Metric",
+            labels={"metric_name": "Metric", "avg_value": "Average Value"},
+        )
+        st.plotly_chart(fig_avg, use_container_width=True)
+
+        # Time series: metric values over runs (if start_time available)
+        if "start_time" in eval_df.columns and eval_df["start_time"].notna().any():
+            eval_df["start_time"] = pd.to_datetime(eval_df["start_time"])
+            fig_ts = px.scatter(
+                eval_df,
+                x="start_time",
+                y="metric_value",
+                color="metric_name",
+                title="Metric Values Over Time",
+                labels={
+                    "start_time": "Run Time",
+                    "metric_value": "Value",
+                    "metric_name": "Metric",
+                },
+            )
+            st.plotly_chart(fig_ts, use_container_width=True)
+
+        st.subheader("All Evaluation Records")
+        st.dataframe(
+            eval_df[["run_id", "metric_name", "metric_value", "start_time"]].rename(
+                columns={
+                    "run_id": "Run ID",
+                    "metric_name": "Metric",
+                    "metric_value": "Value",
+                    "start_time": "Time",
+                }
+            ),
+            use_container_width=True,
+        )
 
 # ---------------------------------------------------------------------------
 # Page: Replay & Diff

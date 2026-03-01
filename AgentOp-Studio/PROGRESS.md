@@ -1,6 +1,6 @@
 # AgentOp-Studio — Progress Tracker
 
-_Last updated: 2026-02-28_
+_Last updated: 2026-03-01_
 
 ---
 
@@ -51,26 +51,29 @@ _Last updated: 2026-02-28_
 
 | Test File | Tests | Coverage | Status |
 |-----------|-------|----------|--------|
-| `tests/test_costs.py` | 6 | Cost estimation: known models, zero tokens, unknown model fallback, scaling | ✅ Done |
+| `tests/test_costs.py` | 13 | Mistral cost estimation (6) + ElevenLabs cost estimation (7) | ✅ Done |
 | `tests/test_replay.py` | 6 | Diff logic: identical strings, changed strings, unified format, multiline, add/remove | ✅ Done |
-| `tests/test_db.py` | 7 | Schema creation, runs/messages/tool_calls/diffs/evaluations CRUD with tmp_path fixtures | ✅ Done |
-| **Total** | **19** | | ✅ All passing |
+| `tests/test_db.py` | 6 | Schema creation, runs/messages/tool_calls/diffs/evaluations CRUD with tmp_path fixtures | ✅ Done |
+| `tests/test_retry.py` | 12 | Retry logic: retryable/non-retryable errors, decorator behavior, config | ✅ Done |
+| `tests/test_eval.py` | 11 | Memory snapshot DB (2), POST /eval (3), GET /evals (2), GET /evals/{run_id} (2), GET /runs/{id}/memory (2) | ✅ Done |
+| **Total** | **48** | | ✅ All passing |
 
 ---
 
 ## Phase 2 — Integrations & Evaluation
 
-**Status: PENDING**
+**Status: MOSTLY COMPLETE**
 
 | Feature | Priority | Notes | Status |
 |---------|----------|-------|--------|
-| Memory snapshot capture | High | Populate `memory_snapshots` table during agent runs | Pending |
-| Memory viewer (frontend) | High | New page or expander in Run Detail | Pending |
-| Evaluation metric logging | High | `POST /eval` endpoint + evaluations table write | Pending |
-| Evaluation dashboard | Medium | Charts: success rate, custom metrics over time | Pending |
+| Memory snapshot capture | High | Captures messages state after each tool-call round in `memory_snapshots` table | ✅ Done |
+| Memory viewer (frontend) | High | Expandable per-snapshot JSON viewer in Run Detail page | ✅ Done |
+| Evaluation metric logging | High | `POST /eval` + `GET /evals` + `GET /evals/{run_id}` endpoints, writes to evaluations table | ✅ Done |
+| Evaluation dashboard | Medium | New "Evaluations" page: KPI metrics, bar chart, time-series scatter | ✅ Done |
+| Log eval from UI | High | "Log Evaluation" form in Run Detail page | ✅ Done |
+| ElevenLabs TTS cost tracking | Low | `estimate_elevenlabs_cost(chars, tier)` in costs.py; 5 tiers with real pricing | ✅ Done |
+| W&B artifact upload | Medium | `_log_to_wandb()` now uploads full run JSON as `agent-run` artifact when W&B is configured | ✅ Done |
 | HuggingFace leaderboard export | Medium | Upload evaluation results as HF dataset | Pending |
-| ElevenLabs TTS cost tracking | Low | Extend costs.py with ElevenLabs per-char pricing | Pending |
-| W&B artifact upload | Medium | Upload DuckDB snapshot or run JSONs as W&B artifacts | Pending |
 | Multi-agent run grouping | Low | Group runs by session/experiment in DB + UI | Pending |
 
 ---
@@ -94,10 +97,11 @@ _Last updated: 2026-02-28_
 | Issue | Impact | Fix |
 |-------|--------|-----|
 | ~~`eval()` used in frontend for config JSON parsing~~ | ~~Security risk~~ | Fixed: replaced with `json.loads()` in `frontend/app.py` | ✅ Fixed |
-| `memory_snapshots` table never written | Feature gap | Wire into instrumented_agent.py in Phase 2 |
-| `evaluations` table never written | Feature gap | Add POST /eval endpoint in Phase 2 |
+| ~~`memory_snapshots` table never written~~ | ~~Feature gap~~ | ✅ Fixed: instrumented_agent.py now captures a snapshot after each tool-call round |
+| ~~`evaluations` table never written~~ | ~~Feature gap~~ | ✅ Fixed: POST /eval endpoint writes metrics; frontend has Log Evaluation form |
+| ~~No retry logic on Mistral API failures~~ | ~~Flaky under rate limits~~ | ✅ Fixed: backend/retry.py with tenacity exponential backoff |
+| ~~`@app.on_event` deprecation warning~~ | ~~Test noise~~ | ✅ Fixed: migrated to lifespan context manager |
 | Single DuckDB file has no WAL conflict protection | Race condition risk under concurrent load | Acceptable for demo; use Postgres for production |
-| No retry logic on Mistral API failures | Flaky under rate limits | Add exponential backoff |
 
 ---
 

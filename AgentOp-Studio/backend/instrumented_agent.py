@@ -18,17 +18,30 @@ from agents.tools import get_tools
 
 from .costs import estimate_cost
 from .db import get_conn, init_schema
+from .retry import retry_mistral_call
 
 load_dotenv()
 
 _MAX_TOOL_ROUNDS = 5
 
 
-def _log_to_wandb(run_id: str, model: str, total_tokens: int, total_cost: float, status: str) -> None:
-    """Log run metrics to Weights & Biases if WANDB_API_KEY is configured."""
+def _log_to_wandb(
+    run_id: str,
+    model: str,
+    total_tokens: int,
+    total_cost: float,
+    status: str,
+    run_data: dict | None = None,
+) -> None:
+    """Log run metrics to Weights & Biases if WANDB_API_KEY is configured.
+
+    Also uploads the full run JSON as a W&B artifact when run_data is supplied.
+    """
     if not os.getenv("WANDB_API_KEY"):
         return
     try:
+        import tempfile  # noqa: PLC0415
+
         import wandb  # noqa: PLC0415
 
         project = os.getenv("WANDB_PROJECT", "agentops-studio")
@@ -42,6 +55,19 @@ def _log_to_wandb(run_id: str, model: str, total_tokens: int, total_cost: float,
                 "model": model,
             }
         )
+        if run_data:
+            artifact = wandb.Artifact(
+                name=f"run-{run_id[:8]}",
+                type="agent-run",
+                description=f"Full run data for {run_id}",
+            )
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False
+            ) as f:
+                json.dump(run_data, f, default=str)
+                tmp_path = f.name
+            artifact.add_file(tmp_path, name="run.json")
+            wandb.log_artifact(artifact)
         wandb.finish()
     except Exception:
         pass  # W&B logging is best-effort
@@ -95,6 +121,7 @@ def run_instrumented(
 
     messages_log: list[dict] = []
     tool_calls_log: list[dict] = []
+    memory_snapshots_log: list[dict] = []
 
     total_tokens = 0
     final_response = ""
@@ -127,14 +154,19 @@ def run_instrumented(
             }
         )
 
-        for _ in range(_MAX_TOOL_ROUNDS):
-            response = client.chat.complete(
+        # Wrap API call with retry logic
+        @retry_mistral_call
+        def _call_with_tools():
+            return client.chat.complete(
                 model=model,
                 messages=messages,
                 tools=tools,
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+
+        for _ in range(_MAX_TOOL_ROUNDS):
+            response = _call_with_tools()
 
             usage = response.usage
             if usage:
@@ -235,14 +267,28 @@ def run_instrumented(
                         "finish_reason": None,
                     }
                 )
+
+            # Capture memory snapshot after completing this tool round
+            memory_snapshots_log.append(
+                {
+                    "memory_id": str(uuid.uuid4()),
+                    "run_id": run_id,
+                    "timestamp": datetime.now(timezone.utc),
+                    "memory_json": json.dumps(messages, default=str),
+                }
+            )
         else:
             # Exhausted tool rounds — do a final completion without tools
-            final_resp = client.chat.complete(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            @retry_mistral_call
+            def _call_final():
+                return client.chat.complete(
+                    model=model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            
+            final_resp = _call_final()
             usage = final_resp.usage
             if usage:
                 total_tokens += usage.total_tokens or 0
@@ -302,6 +348,20 @@ def run_instrumented(
                 tc["latency_ms"],
             ],
         )
+    for snap in memory_snapshots_log:
+        conn.execute(
+            """
+            INSERT INTO memory_snapshots
+                (memory_id, run_id, timestamp, memory_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                snap["memory_id"],
+                snap["run_id"],
+                snap["timestamp"],
+                snap["memory_json"],
+            ],
+        )
     conn.execute(
         """
         UPDATE runs
@@ -316,7 +376,16 @@ def run_instrumented(
     )
     conn.close()
 
-    _log_to_wandb(run_id, model, total_tokens, total_cost, status)
+    run_data = {
+        "run_id": run_id,
+        "model": model,
+        "total_tokens": total_tokens,
+        "total_cost": total_cost,
+        "status": status,
+        "messages": messages_log,
+        "tool_calls": tool_calls_log,
+    }
+    _log_to_wandb(run_id, model, total_tokens, total_cost, status, run_data=run_data)
 
     return {
         "run_id": run_id,

@@ -1,14 +1,20 @@
 """FastAPI backend for AgentOps-Studio.
 
 Endpoints:
-    POST /run           Run the agent with a prompt.
-    POST /replay        Replay a run with optional parameter overrides.
-    GET  /runs          List all runs.
-    GET  /runs/{run_id} Full run detail (messages + tool calls).
+    POST /run                   Run the agent with a prompt.
+    POST /replay                Replay a run with optional parameter overrides.
+    GET  /runs                  List all runs.
+    GET  /runs/{run_id}         Full run detail (messages + tool calls).
+    GET  /runs/{run_id}/memory  Memory snapshots for a run.
+    POST /eval                  Log evaluation metrics for a run.
+    GET  /evals                 List all evaluation records.
+    GET  /evals/{run_id}        Evaluations for a specific run.
 """
 
 from __future__ import annotations
 
+import uuid
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -18,12 +24,14 @@ from .db import get_conn, init_schema
 from .instrumented_agent import run_instrumented
 from .replay import replay_run
 
-app = FastAPI(title="AgentOps-Studio", version="0.1.0")
 
-
-@app.on_event("startup")
-def startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ARG001
     init_schema()
+    yield
+
+
+app = FastAPI(title="AgentOps-Studio", version="0.1.0", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +47,11 @@ class RunRequest(BaseModel):
 class ReplayRequest(BaseModel):
     run_id: str
     override_params: dict[str, Any] | None = None
+
+
+class EvalRequest(BaseModel):
+    run_id: str
+    metrics: dict[str, float]
 
 
 # ---------------------------------------------------------------------------
@@ -130,3 +143,87 @@ def get_run(run_id: str) -> dict:
 
     conn.close()
     return run
+
+
+@app.get("/runs/{run_id}/memory")
+def get_run_memory(run_id: str) -> list[dict]:
+    """Return memory snapshots for a run, ordered by timestamp."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT memory_id, run_id, timestamp, memory_json
+        FROM memory_snapshots WHERE run_id = ?
+        ORDER BY timestamp
+        """,
+        [run_id],
+    ).fetchall()
+    conn.close()
+    keys = ["memory_id", "run_id", "timestamp", "memory_json"]
+    return [dict(zip(keys, r)) for r in rows]
+
+
+@app.post("/eval")
+def post_eval(req: EvalRequest) -> dict:
+    """Log evaluation metrics for a run.
+
+    Accepts a dict of {metric_name: metric_value} pairs and persists each
+    as a separate row in the evaluations table.
+    """
+    conn = get_conn()
+
+    # Verify the run exists
+    row = conn.execute(
+        "SELECT run_id FROM runs WHERE run_id = ?", [req.run_id]
+    ).fetchone()
+    if row is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Run {req.run_id!r} not found")
+
+    eval_ids = []
+    for metric_name, metric_value in req.metrics.items():
+        eval_id = str(uuid.uuid4())
+        conn.execute(
+            """
+            INSERT INTO evaluations (eval_id, run_id, metric_name, metric_value)
+            VALUES (?, ?, ?, ?)
+            """,
+            [eval_id, req.run_id, metric_name, float(metric_value)],
+        )
+        eval_ids.append(eval_id)
+
+    conn.close()
+    return {"run_id": req.run_id, "eval_ids": eval_ids, "metrics_logged": len(eval_ids)}
+
+
+@app.get("/evals")
+def list_evals() -> list[dict]:
+    """Return all evaluation records, newest runs first."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT e.eval_id, e.run_id, e.metric_name, e.metric_value,
+               r.start_time, r.agent_id
+        FROM evaluations e
+        LEFT JOIN runs r ON e.run_id = r.run_id
+        ORDER BY r.start_time DESC
+        """
+    ).fetchall()
+    conn.close()
+    keys = ["eval_id", "run_id", "metric_name", "metric_value", "start_time", "agent_id"]
+    return [dict(zip(keys, r)) for r in rows]
+
+
+@app.get("/evals/{run_id}")
+def get_evals_for_run(run_id: str) -> list[dict]:
+    """Return evaluation records for a specific run."""
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT eval_id, run_id, metric_name, metric_value
+        FROM evaluations WHERE run_id = ?
+        """,
+        [run_id],
+    ).fetchall()
+    conn.close()
+    keys = ["eval_id", "run_id", "metric_name", "metric_value"]
+    return [dict(zip(keys, r)) for r in rows]

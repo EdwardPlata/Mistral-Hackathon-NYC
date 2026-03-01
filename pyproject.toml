@@ -12,6 +12,11 @@ dependencies = [
     "wandb>=0.17.0",
     "elevenlabs>=1.0.0",
     "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "huggingface-hub>=1.5.0",
+    "onnx>=1.20.1",
+    "onnxruntime>=1.24.2",
+    "onnxconverter-common>=1.16.0",
 ]
 
 [project.optional-dependencies]
@@ -28,13 +33,38 @@ ml-gpu = [
     "peft>=0.10.0",
     "trl>=0.8.6",
 ]
+databricks = [
+    "mcp>=1.0.0",
+    "databricks-sdk>=0.20.0",
+]
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.4.0",
+    "mcp>=1.0.0",
+]
+agentops = [
+    "duckdb>=0.10.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "streamlit>=1.35.0",
+    "plotly>=5.22.0",
+    "pandas>=2.2.0",
+    "httpx>=0.27.0",
+    "tenacity>=8.2.0",
+]
+conversion = [
+    "onnx>=1.16.0",
+    "onnxruntime>=1.18.0",
+    "onnxconverter-common>=1.14.0",
+]
+ui = [
+    "streamlit>=1.35.0",
+    "plotly>=5.22.0",
+    "pandas>=2.2.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["agents"]
+packages = ["agents", "mcp_servers"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu121" }
@@ -43,3 +73,11 @@ torch = { index = "pytorch-cu121" }
 name = "pytorch-cu121"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["AgentOp-Studio/tests", "DataBolt-Edge/databricks/tests"]
