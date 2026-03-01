@@ -1,0 +1,373 @@
+# AgentOps Studio
+## Demo Plan: Databricks Workflow Intelligence Agent
+
+---
+
+# 0. Objective
+
+Build a production-grade AI agent that:
+
+- Connects to Databricks via REST API 2.1
+- Analyzes a specific Workflow (Job ID)
+- Retrieves runs, tasks, cluster configuration, and performance metadata
+- Detects inefficiencies, retry patterns, skew risk, cost waste
+- Logs full agent trace into AgentOps Studio
+- Supports deterministic replay and model benchmarking
+
+This is NOT a chatbot.
+This is workflow observability + LLM reasoning + MLOps instrumentation.
+
+---
+
+# 1. Demo Story (2-Minute Flow)
+
+1. User enters `job_id`
+2. Agent fetches job metadata via Databricks API
+3. Agent fetches last 5 runs
+4. Agent selects worst-performing run
+5. Agent analyzes:
+   - Duration breakdown
+   - Retry attempts
+   - Cluster size vs runtime
+   - Cost estimation
+6. Agent produces structured performance report
+7. Show trace tree (tool calls)
+8. Replay with different model
+9. Show output diff + latency + cost delta
+
+Final Message:
+"This is Workflow Intelligence — not prompting."
+
+---
+
+# 2. MVP Scope
+
+## Required
+- Jobs API integration
+- Runs API integration
+- Cluster metadata retrieval
+- Cost estimation logic
+- 3–5 intelligent recommendations
+- Full trace logging
+- Deterministic replay
+
+## Not Required (MVP)
+- Ganglia metrics
+- Spark UI scraping
+- Vector DB
+- Full memory system
+- Production auth flows
+
+---
+
+# 3. System Architecture
+
+Agent Layer
+- Planner
+- Tool Executor
+- Structured Output Formatter
+- Replay Controller
+
+Tool Layer
+- get_job_metadata
+- get_recent_runs
+- get_run_details
+- estimate_cost
+- detect_performance_issues
+
+Observability Layer (AgentOps)
+- run logging
+- tool logging
+- latency tracking
+- token tracking
+- replay metadata
+
+Frontend Layer
+- job input form
+- trace explorer
+- cost dashboard
+- model comparison view
+
+---
+
+# 4. Databricks API Integration
+
+Base URL:
+https://<workspace>/api/2.1/
+
+Authentication:
+Bearer <DATABRICKS_TOKEN>
+
+Endpoints:
+
+GET /jobs/get
+GET /jobs/runs/list
+GET /jobs/runs/get
+GET /clusters/get
+
+---
+
+# 5. Tool Contracts
+
+## Tool: get_job_metadata
+
+Input:
+{
+  "job_id": int
+}
+
+Output:
+{
+  "name": str,
+  "tasks": [],
+  "schedule": {},
+  "cluster_spec": {},
+  "timeout_seconds": int
+}
+
+---
+
+## Tool: get_recent_runs
+
+Input:
+{
+  "job_id": int,
+  "limit": int
+}
+
+Output:
+[
+  {
+    "run_id": int,
+    "state": str,
+    "duration_ms": int,
+    "attempt_number": int,
+    "cluster_instance": {}
+  }
+]
+
+---
+
+## Tool: get_run_details
+
+Input:
+{
+  "run_id": int
+}
+
+Output:
+{
+  "tasks": [
+    {
+      "task_key": str,
+      "duration_ms": int,
+      "state": str,
+      "retry_count": int
+    }
+  ],
+  "start_time": int,
+  "end_time": int
+}
+
+---
+
+## Tool: estimate_cost
+
+Input:
+{
+  "cluster_workers": int,
+  "runtime_minutes": float,
+  "dbu_rate": float
+}
+
+Output:
+{
+  "estimated_cost_usd": float,
+  "inefficiency_score": float
+}
+
+---
+
+## Tool: detect_performance_issues
+
+Input:
+{
+  "run_details": {},
+  "job_metadata": {}
+}
+
+Output:
+{
+  "retry_risk": float,
+  "skew_risk": float,
+  "underprovisioning_risk": float,
+  "recommendations": []
+}
+
+---
+
+# 6. Agent Reasoning Flow
+
+1. Call get_job_metadata
+2. Call get_recent_runs
+3. Identify longest + failed run
+4. Call get_run_details
+5. Call detect_performance_issues
+6. Call estimate_cost
+7. Generate structured report
+
+---
+
+# 7. Structured Output Format
+
+{
+  "summary": str,
+  "performance_findings": [],
+  "retry_analysis": {},
+  "cost_analysis": {},
+  "recommendations": [],
+  "confidence_score": float
+}
+
+---
+
+# 8. AgentOps Logging Schema
+
+## runs table
+
+- run_uuid
+- model_name
+- temperature
+- start_time
+- end_time
+- total_latency_ms
+- token_input
+- token_output
+- total_cost_usd
+
+## tool_calls table
+
+- call_uuid
+- run_uuid
+- tool_name
+- input_json
+- output_json
+- latency_ms
+
+## evaluations table
+
+- run_uuid
+- inefficiency_score
+- retry_risk_score
+- skew_risk_score
+
+---
+
+# 9. Deterministic Replay
+
+Store:
+- prompt version
+- tool outputs
+- model name
+- temperature
+- seed
+- system instructions
+
+Replay Flow:
+- reload tool outputs OR re-fetch live
+- re-run agent
+- compute diff between structured outputs
+- compute cost + latency delta
+
+---
+
+# 10. Model Benchmark Mode
+
+Run same workflow analysis using:
+
+- mistral-small
+- mistral-medium
+
+Capture:
+
+- latency difference
+- token cost difference
+- recommendation variance
+- output stability
+
+Display comparison table in UI.
+
+---
+
+# 11. Scoring Engine
+
+Define:
+
+inefficiency_score =
+  weighted(
+    retry_risk * 0.4,
+    skew_risk * 0.3,
+    underprovisioning_risk * 0.3
+  )
+
+Confidence score =
+  model_confidence * data_completeness_score
+
+---
+
+# 12. Demo Data Strategy
+
+If live Databricks unavailable:
+- mock run JSON from real job
+- simulate large duration + retries
+- simulate cluster overprovisioning
+
+Keep at least 1 real job ID for live demo.
+
+---
+
+# 13. Demo Script
+
+1. Enter job ID
+2. Agent begins live analysis
+3. Show tool call tree
+4. Show cost estimation
+5. Show retry heatmap
+6. Replay with second model
+7. Show diff
+8. Conclude:
+
+"This system provides reproducible workflow intelligence
+with traceable reasoning and cost-aware analysis."
+
+---
+
+# 14. Future Extensions (Post-Hackathon)
+
+- CI/CD gate for inefficient jobs
+- Slack alert integration
+- Auto cluster resizing suggestion
+- Auto pull request with optimization config
+- Fine-tune model on failure patterns
+
+---
+
+# 15. Win Criteria Alignment
+
+Technicality:
+- Multi-step tool orchestration
+- Structured reasoning
+- Replay engine
+
+Creativity:
+- AI-powered workflow observability
+
+Usefulness:
+- Enterprise Databricks optimization
+
+Demo:
+- Live trace + replay
+
+Track Alignment:
+- Deep Mistral tool usage
+- Architectural innovation

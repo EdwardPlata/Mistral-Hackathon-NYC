@@ -1,0 +1,28 @@
+{
+  "os":  "Linux-6.8.0-1044-azure-x86_64-with-glibc2.36",
+  "python":  "CPython 3.11.14",
+  "startedAt":  "2026-03-01T16:15:38.877425Z",
+  "program":  "/workspaces/Mistral-Hackathon-NYC/AgentOp-Studio/scripts/mistral_training_demo.py",
+  "codePath":  "AgentOp-Studio/scripts/mistral_training_demo.py",
+  "codePathLocal":  "AgentOp-Studio/scripts/mistral_training_demo.py",
+  "git":  {
+    "remote":  "https://github.com/EdwardPlata/Mistral-Hackathon-NYC",
+    "commit":  "0be93d3c690511dafd5d63d8f9a4138242188861"
+  },
+  "email":  "eddy@datablock.pro",
+  "root":  "/workspaces/Mistral-Hackathon-NYC",
+  "host":  "codespaces-51461a",
+  "executable":  "/workspaces/Mistral-Hackathon-NYC/.venv/bin/python3",
+  "cpu_count":  1,
+  "cpu_count_logical":  2,
+  "disk":  {
+    "/":  {
+      "total":  "33636024320",
+      "used":  "8472875008"
+    }
+  },
+  "memory":  {
+    "total":  "8330473472"
+  },
+  "writerId":  "a5s1leayu2pszbqml2l8bio1p3ia6xi3"
+}

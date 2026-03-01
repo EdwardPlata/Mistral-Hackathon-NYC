@@ -18,6 +18,14 @@ from dotenv import load_dotenv
 from agents import tools as tool_module
 from agents.tools import get_tools
 
+# Note: backend.retry import will work when PYTHONPATH includes AgentOp-Studio/
+try:
+    from backend.retry import retry_mistral_call
+except ImportError:
+    # Fallback: no retry if backend module not in path
+    def retry_mistral_call(func):
+        return func
+
 load_dotenv()
 
 # Maximum number of tool-call rounds before stopping
@@ -74,14 +82,19 @@ def run_agent(prompt: str) -> str:
 
     messages: list[dict] = [{"role": "user", "content": prompt}]
 
-    for _ in range(_MAX_TOOL_ROUNDS):
-        response = client.chat.complete(
+    # Wrap API call with retry logic
+    @retry_mistral_call
+    def _call_with_tools():
+        return client.chat.complete(
             model=model,
             messages=messages,
             tools=tools,
             max_tokens=max_tokens,
             temperature=temperature,
         )
+
+    for _ in range(_MAX_TOOL_ROUNDS):
+        response = _call_with_tools()
 
         choice = response.choices[0]
         assistant_message = choice.message
@@ -106,12 +119,16 @@ def run_agent(prompt: str) -> str:
             })
 
     # If we exhausted tool rounds, do a final completion without tools.
-    final_response = client.chat.complete(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
+    @retry_mistral_call
+    def _call_final():
+        return client.chat.complete(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+    
+    final_response = _call_final()
     return final_response.choices[0].message.content or ""
 
 

@@ -1,0 +1,43 @@
+# OpenClaw Configuration for DataBolt-Edge
+# NVIDIA API Management & GPU-Accelerated Data Processing
+
+project:
+  name: "DataBolt-Edge"
+  description: "NVIDIA API management system with GPU-accelerated processing"
+  root_path: "../../DataBolt-Edge"
+  
+workflow:
+  type: "research-plan-implement"
+  planning_files:
+    task_plan: "task_plan.md"
+    findings: "findings.md"
+    progress: "progress.md"
+
+rules:
+  - name: "2-action-save"
+    description: "After every 2 search/view operations, save findings to files"
+  - name: "read-before-decide"
+    description: "Re-read planning files before major implementation decisions"
+  - name: "3-strike-protocol"
+    description: "Track failed attempts and mutate approach after 3 failures"
+
+focus_areas:
+  - path: "nvidia_api_management"
+    description: "Core NVIDIA API client and authentication logic"
+  - path: "tests"
+    description: "Test suite for API management functionality"
+  - path: "scripts"
+    description: "Utility scripts for testing and probing APIs"
+
+dependencies:
+  - "mistralai"
+  - "transformers"
+  - "nvidia SDK libraries"
+
+context_priority:
+  - "nvidia_api_management/client.py"
+  - "nvidia_api_management/auth.py"
+  - "nvidia_api_management/config.py"
+  - "tests/test_nvidia_client.py"
+  - "README.md"
+  - "Makefile"

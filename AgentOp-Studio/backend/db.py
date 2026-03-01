@@ -85,4 +85,23 @@ def init_schema() -> None:
             metric_value DOUBLE
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS knowledge_base (
+            kb_id             VARCHAR PRIMARY KEY,
+            created_at        TIMESTAMP,
+            error_category    VARCHAR,
+            error_description TEXT,
+            job_name          VARCHAR,
+            task_key          VARCHAR,
+            root_cause        TEXT,
+            recommended_fix   TEXT,
+            fix_code          TEXT,
+            fix_location      VARCHAR,
+            prevention        TEXT,
+            confidence        DOUBLE,
+            mistral_model     VARCHAR,
+            tokens_used       INTEGER,
+            logged_to_wandb   BOOLEAN
+        )
+    """)
     conn.close()

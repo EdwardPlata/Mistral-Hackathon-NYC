@@ -1,0 +1,44 @@
+_wandb:
+    value:
+        cli_version: 0.25.0
+        e:
+            tkna4j09mwhlczcnjdv2swnnxmh6fkds:
+                args:
+                    - backend.main:app
+                    - --port
+                    - "8000"
+                    - --host
+                    - 0.0.0.0
+                codePath: .venv/bin/uvicorn
+                codePathLocal: .venv/bin/uvicorn
+                cpu_count: 1
+                cpu_count_logical: 2
+                disk:
+                    /:
+                        total: "33636024320"
+                        used: "8481714176"
+                email: eddy@datablock.pro
+                executable: /workspaces/Mistral-Hackathon-NYC/.venv/bin/python3
+                git:
+                    commit: 0be93d3c690511dafd5d63d8f9a4138242188861
+                    remote: https://github.com/EdwardPlata/Mistral-Hackathon-NYC
+                host: codespaces-51461a
+                memory:
+                    total: "8330473472"
+                os: Linux-6.8.0-1044-azure-x86_64-with-glibc2.36
+                program: /workspaces/Mistral-Hackathon-NYC/.venv/bin/uvicorn
+                python: CPython 3.11.14
+                root: /workspaces/Mistral-Hackathon-NYC
+                startedAt: "2026-03-01T16:22:01.627998Z"
+                writerId: tkna4j09mwhlczcnjdv2swnnxmh6fkds
+        m: []
+        python_version: 3.11.14
+        t:
+            "3":
+                - 2
+                - 13
+                - 14
+            "4": 3.11.14
+            "5": 0.25.0
+            "12": 0.25.0
+            "13": linux-x86_64

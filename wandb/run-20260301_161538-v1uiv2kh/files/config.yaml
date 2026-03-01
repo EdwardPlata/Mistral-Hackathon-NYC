@@ -1,0 +1,58 @@
+_wandb:
+    value:
+        cli_version: 0.25.0
+        e:
+            a5s1leayu2pszbqml2l8bio1p3ia6xi3:
+                codePath: AgentOp-Studio/scripts/mistral_training_demo.py
+                codePathLocal: AgentOp-Studio/scripts/mistral_training_demo.py
+                cpu_count: 1
+                cpu_count_logical: 2
+                disk:
+                    /:
+                        total: "33636024320"
+                        used: "8472875008"
+                email: eddy@datablock.pro
+                executable: /workspaces/Mistral-Hackathon-NYC/.venv/bin/python3
+                git:
+                    commit: 0be93d3c690511dafd5d63d8f9a4138242188861
+                    remote: https://github.com/EdwardPlata/Mistral-Hackathon-NYC
+                host: codespaces-51461a
+                memory:
+                    total: "8330473472"
+                os: Linux-6.8.0-1044-azure-x86_64-with-glibc2.36
+                program: /workspaces/Mistral-Hackathon-NYC/AgentOp-Studio/scripts/mistral_training_demo.py
+                python: CPython 3.11.14
+                root: /workspaces/Mistral-Hackathon-NYC
+                startedAt: "2026-03-01T16:15:38.877425Z"
+                writerId: a5s1leayu2pszbqml2l8bio1p3ia6xi3
+        m: []
+        python_version: 3.11.14
+        t:
+            "3":
+                - 2
+                - 13
+                - 15
+                - 16
+                - 61
+            "4": 3.11.14
+            "5": 0.25.0
+            "10":
+                - 20
+            "12": 0.25.0
+            "13": linux-x86_64
+batch_size:
+    value: 4
+dataset:
+    value: tatsu-lab/alpaca
+learning_rate:
+    value: 0.0002
+lora_rank:
+    value: 16
+max_seq_len:
+    value: 512
+model:
+    value: mistral-7b-instruct-v0.2
+num_steps:
+    value: 100
+warmup_steps:
+    value: 10

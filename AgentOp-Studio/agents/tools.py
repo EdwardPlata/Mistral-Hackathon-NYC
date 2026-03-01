@@ -16,6 +16,66 @@ from typing import Any
 # Weights & Biases
 # ---------------------------------------------------------------------------
 
+def wandb_list_runs(project: str | None = None, limit: int = 10) -> list[dict]:
+    """List recent W&B runs for a project, with key metrics.
+
+    Args:
+        project: W&B project name (defaults to WANDB_PROJECT env var or
+                 "agentops-studio").
+        limit: Maximum number of runs to return.
+
+    Returns:
+        List of dicts with run id, name, state, created_at, and summary metrics.
+    """
+    import wandb  # noqa: PLC0415
+
+    project = project or os.getenv("WANDB_PROJECT", "agentops-studio")
+    api = wandb.Api()
+    runs = api.runs(project, per_page=limit)
+    result = []
+    for run in runs:
+        result.append({
+            "id": run.id,
+            "name": run.name,
+            "state": run.state,
+            "created_at": str(run.created_at),
+            "url": run.url,
+            "summary": {k: v for k, v in run.summary.items() if not k.startswith("_")},
+        })
+        if len(result) >= limit:
+            break
+    return result
+
+
+def wandb_get_run_metrics(run_id: str, project: str | None = None) -> dict:
+    """Fetch summary metrics and config for a specific W&B run.
+
+    Args:
+        run_id: W&B run ID (short hash shown in the UI).
+        project: W&B project name (defaults to WANDB_PROJECT env var or
+                 "agentops-studio").
+
+    Returns:
+        Dict with run metadata, config, and summary metrics.
+    """
+    import wandb  # noqa: PLC0415
+
+    project = project or os.getenv("WANDB_PROJECT", "agentops-studio")
+    api = wandb.Api()
+    entity = api.default_entity
+    run = api.run(f"{entity}/{project}/{run_id}")
+    return {
+        "id": run.id,
+        "name": run.name,
+        "state": run.state,
+        "url": run.url,
+        "created_at": str(run.created_at),
+        "config": dict(run.config),
+        "summary": {k: v for k, v in run.summary.items() if not k.startswith("_")},
+        "tags": list(run.tags),
+    }
+
+
 def wandb_log(metrics: dict[str, Any], step: int | None = None) -> str:
     """Log a dictionary of metrics to Weights & Biases.
 
@@ -90,6 +150,48 @@ def elevenlabs_speak(text: str, voice_id: str = "Rachel", output_path: str = "/t
 def get_tools() -> list[dict[str, Any]]:
     """Return the list of tool schemas for Mistral function calling."""
     return [
+        {
+            "type": "function",
+            "function": {
+                "name": "wandb_list_runs",
+                "description": "List recent W&B runs for a project with their metrics.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project": {
+                            "type": "string",
+                            "description": "W&B project name (defaults to WANDB_PROJECT env var).",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max number of runs to return (default 10).",
+                        },
+                    },
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "wandb_get_run_metrics",
+                "description": "Get config and summary metrics for a specific W&B run.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "run_id": {
+                            "type": "string",
+                            "description": "W&B run ID (short hash shown in the dashboard).",
+                        },
+                        "project": {
+                            "type": "string",
+                            "description": "W&B project name (defaults to WANDB_PROJECT env var).",
+                        },
+                    },
+                    "required": ["run_id"],
+                },
+            },
+        },
         {
             "type": "function",
             "function": {

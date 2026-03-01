@@ -1,0 +1,102 @@
+bundle:
+  name: nyc-taxi-pipeline
+
+variables:
+  catalog:
+    description: Unity Catalog catalog name
+    default: workspace
+  schema:
+    description: Unity Catalog schema name
+    default: nyc_taxi
+  # TLC download date range — defaults to 3 months of 2023 data (~150 MB)
+  start_year_month:
+    description: First month of TLC data to download (YYYY-MM)
+    default: "2023-01"
+  end_year_month:
+    description: Last month of TLC data to download, inclusive (YYYY-MM)
+    default: "2023-03"
+  # DBFS path where the download notebook will write the raw parquet files
+  nyc_taxi_raw_path:
+    description: DBFS destination for downloaded yellow taxi parquet files
+    default: dbfs:/tmp/nyc-taxi-raw/yellow
+
+targets:
+  dev:
+    mode: development     # sets development=true on DLT pipelines automatically
+    default: true
+    # workspace.host is read from DATABRICKS_HOST env var at runtime
+    variables:
+      catalog: workspace
+      schema: nyc_taxi_dev
+
+  prod:
+    mode: production
+    # workspace.host is read from DATABRICKS_HOST env var at runtime
+    variables:
+      catalog: workspace
+      schema: nyc_taxi
+
+resources:
+  # ── Delta Live Tables pipeline ──────────────────────────────────────────────
+  pipelines:
+    nyc_taxi_dlt:
+      name: "NYC Taxi DLT Pipeline [${bundle.target}]"
+      target: ${var.schema}
+      catalog: ${var.catalog}
+      # No clusters block — workspace enforces serverless compute for DLT
+      serverless: true
+      libraries:
+        - notebook:
+            path: ./src/nyc_taxi/dlt_pipeline.py
+      configuration:
+        # Points at the DBFS path populated by the download_raw_data workflow task
+        nyc_taxi_source_path: ${var.nyc_taxi_raw_path}
+        catalog: ${var.catalog}
+        schema: ${var.schema}
+      continuous: false
+
+  # ── Orchestrating workflow ──────────────────────────────────────────────────
+  jobs:
+    nyc_taxi_workflow:
+      name: "NYC Taxi Workflow [${bundle.target}]"
+      max_concurrent_runs: 1
+      tasks:
+        # Task 1: Download raw TLC parquet files from CloudFront into DBFS
+        - task_key: download_raw_data
+          description: >-
+            Fetch yellow taxi parquet files from the TLC CloudFront CDN
+            (https://github.com/toddwschneider/nyc-taxi-data) into DBFS.
+            Skips files that are already present (idempotent).
+          notebook_task:
+            notebook_path: ./src/nyc_taxi/download_data.py
+            base_parameters:
+              start_year_month: ${var.start_year_month}
+              end_year_month:   ${var.end_year_month}
+              target_dbfs_path: ${var.nyc_taxi_raw_path}
+          # No new_cluster — serverless job compute used automatically
+
+        # Task 2: Run the DLT pipeline against the downloaded data
+        - task_key: run_dlt_pipeline
+          description: "Run the full NYC Taxi DLT pipeline (bronze → silver → gold → features)"
+          depends_on:
+            - task_key: download_raw_data
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.nyc_taxi_dlt.id}
+            full_refresh: false
+
+        # Task 3: Spot-check row counts and nullability
+        - task_key: validate_output
+          description: "Spot-check row counts and column nullability on the gold tables"
+          depends_on:
+            - task_key: run_dlt_pipeline
+          notebook_task:
+            notebook_path: ./src/nyc_taxi/validate_output.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema:  ${var.schema}
+          # No new_cluster — serverless job compute used automatically
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: America/New_York
+        pause_status: PAUSED

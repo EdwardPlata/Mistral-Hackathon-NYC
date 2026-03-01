@@ -1,0 +1,425 @@
+# DataBolt-Edge
+## Demo Plan — On-Device AI Performance Copilot for Data Engineers
+
+---
+
+# 0. Objective
+
+Build a fully local, on-device AI assistant that:
+
+- Runs a quantized Mistral model locally (NVIDIA GPU via TensorRT, or NVIDIA API fallback)
+- Ingests Spark logs, Airflow DAG logs, and SQL EXPLAIN plans
+- Extracts structured errors and bottlenecks with dedicated parsers
+- Routes parsed context + user questions through a Mistral inference layer
+- Returns actionable debugging recommendations and SQL rewrites
+- Displays GPU inference telemetry (latency, tokens/sec, model path)
+- Operates fully offline — zero cloud inference calls during demo
+
+Closing line:
+"No data left this machine."
+
+---
+
+# 1. Demo Narrative (2-Minute Flow)
+
+1. Open local Streamlit UI
+2. Select log type: **Spark** | **Airflow** | **SQL**
+3. Upload or paste a sample log / SQL query
+4. Click **Analyze**
+5. Show:
+   - Parsed error summary (structured)
+   - Identified bottlenecks
+   - Model-generated diagnosis and fix
+   - SQL rewrite (for SQL tab)
+   - Inference telemetry (latency ms, tokens/sec, backend in use)
+6. Ask a follow-up question in the chat box
+7. Highlight: **"Model ran locally — 0 external API calls"**
+
+---
+
+# 2. What Is Already Built
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Spark log parser | `parsers/spark.py` | ✅ Complete (218 lines, 26+ tests) |
+| Airflow log parser | `parsers/airflow.py` | ✅ Complete (243 lines) |
+| SQL EXPLAIN parser | `parsers/sql_plan.py` | ✅ Complete (370 lines) |
+| NVIDIA API backend | `inference/nvidia_api_backend.py` | ✅ Complete |
+| Local TRT backend | `inference/local_trt_backend.py` | ✅ Complete (GPU graceful fallback) |
+| Inference factory | `inference/factory.py` | ✅ Auto-selects TRT vs API |
+| ONNX quantization pipeline | `conversion/pipeline.py` | ✅ FP16 + INT8 + benchmarks |
+| ONNX quantization scripts | `scripts/` | ✅ Full CLI tooling |
+| NVIDIA API client | `nvidia_api_management/client.py` | ✅ Retry + backoff + redaction |
+| HuggingFace integration | `huggingface_integration/` | ✅ Model download |
+| Databricks DLT pipeline | `databricks/` | ✅ NYC Taxi bronze→gold |
+| Unit tests | `tests/` | ✅ 1,128 lines, all passing |
+
+---
+
+# 3. What Needs to Be Built
+
+| Component | Target Location | Priority |
+|-----------|----------------|----------|
+| FastAPI backend | `api/server.py` | MUST |
+| DuckDB context store | `api/context_store.py` | MUST |
+| Streamlit UI | `ui/app.py` | MUST |
+| Agent prompt builder | `api/prompt_builder.py` | MUST |
+| GPU telemetry capture | `api/telemetry.py` | SHOULD |
+| SQL diff/rewrite display | UI component | SHOULD |
+| Sample demo logs | `demo_data/` | MUST |
+| CI workflow | `.github/workflows/ci.yml` | SHOULD |
+
+---
+
+# 4. Architecture
+
+```
+User Input (log file / SQL / question)
+          │
+          ▼
+[Streamlit UI — ui/app.py]
+          │  POST /analyze
+          ▼
+[FastAPI Backend — api/server.py]
+     ┌────┴────┐
+     ▼         ▼
+[Parsers]   [Context Store — DuckDB]
+spark.py     spark_errors table
+airflow.py   airflow_failures table
+sql_plan.py  sql_plans table
+     │              │
+     └──────┬────────┘
+            ▼
+  [Prompt Builder — api/prompt_builder.py]
+  (errors + context → structured prompt)
+            │
+            ▼
+  [Inference Factory — inference/factory.py]
+       ┌────┴─────┐
+       ▼           ▼
+ LocalTRT       NvidiaAPI
+ (GPU present)  (fallback)
+       │
+       ▼
+  Model Response (+ telemetry)
+       │
+       ▼
+[Streamlit UI — display]
+```
+
+---
+
+# 5. API Contracts
+
+## POST /analyze
+
+Request:
+```json
+{
+  "log_type": "spark" | "airflow" | "sql",
+  "content": "<raw log or SQL text>",
+  "question": "Why did this fail?"
+}
+```
+
+Response:
+```json
+{
+  "analysis_id": "uuid",
+  "log_type": "spark",
+  "parsed_summary": {
+    "errors": [],
+    "stages": [],
+    "bottlenecks": []
+  },
+  "model_response": "The job failed due to...",
+  "optimized_sql": null,
+  "telemetry": {
+    "backend": "nvidia_api",
+    "latency_ms": 420,
+    "tokens": 312,
+    "model": "mistral-large-latest"
+  }
+}
+```
+
+## GET /results/{analysis_id}
+
+Returns stored analysis record from DuckDB.
+
+## GET /health
+
+Returns backend status, inference backend in use, DB row counts.
+
+---
+
+# 6. DuckDB Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS analyses (
+    analysis_id   VARCHAR PRIMARY KEY,
+    log_type      VARCHAR,
+    raw_content   TEXT,
+    question      TEXT,
+    parsed_json   JSON,
+    model_response TEXT,
+    optimized_sql TEXT,
+    backend       VARCHAR,
+    latency_ms    INTEGER,
+    tokens        INTEGER,
+    created_at    TIMESTAMP
+);
+```
+
+---
+
+# 7. Parser → Prompt → Model Pipeline
+
+### Spark scenario
+
+```python
+from parsers.spark import SparkLogParser
+result = SparkLogParser().parse(raw_log)
+# result: SparkParseResult(errors=[], oom=True, stages=[], ...)
+
+prompt = build_prompt(
+    log_type="spark",
+    summary=result,
+    question="Why did this job fail and how do I fix it?"
+)
+response = inference_factory.infer(prompt)
+```
+
+### SQL scenario
+
+```python
+from parsers.sql_plan import SqlPlanParser
+result = SqlPlanParser().parse(explain_output)
+# result: SqlPlanResult(full_scans=[], joins=[], cost_estimate=...)
+
+prompt = build_prompt(
+    log_type="sql",
+    summary=result,
+    question="Rewrite this query to avoid the full table scan."
+)
+response = inference_factory.infer(prompt)
+```
+
+---
+
+# 8. Tool Contracts (Agent Layer)
+
+## parse_execution_plan
+Input: `{ "content": str, "log_type": str }`
+Output: structured parse result (errors, stages, bottlenecks, costs)
+
+## build_prompt
+Input: `{ "log_type": str, "summary": dict, "question": str }`
+Output: formatted prompt string for Mistral
+
+## run_inference
+Input: `{ "prompt": str }`
+Output: `{ "response": str, "latency_ms": int, "tokens": int, "backend": str }`
+
+## store_result
+Input: full analysis record
+Output: `{ "analysis_id": str }`
+
+---
+
+# 9. Demo Scenarios (3 Scripted Flows)
+
+## Scenario 1: Spark OOM Failure
+
+Sample log: `demo_data/spark_oom.log`
+
+Key patterns:
+- `java.lang.OutOfMemoryError: GC overhead limit exceeded`
+- Executor 7 lost, stage 12 failed
+
+Expected output:
+- Parser extracts: OOM error, executor loss, stage 12, task 847
+- Model response: increase `spark.executor.memory`, enable off-heap, tune `spark.memory.fraction`
+- Telemetry shown: latency ~300–800ms
+
+Demo question: _"Why did this Spark job fail and what should I change to fix it?"_
+
+---
+
+## Scenario 2: Airflow DAG Task Failure
+
+Sample log: `demo_data/airflow_failure.log`
+
+Key patterns:
+- Python traceback (KeyError / connection refused)
+- DAG `data_pipeline_daily`, task `transform_sales`
+
+Expected output:
+- Parser extracts: dag_id, task_id, error category, traceback
+- Model response: explanation + remediation steps
+- Telemetry shown
+
+Demo question: _"What caused this Airflow task to fail and how do I prevent it?"_
+
+---
+
+## Scenario 3: SQL Query Optimization
+
+Sample plan: `demo_data/sql_bad_plan.txt`
+
+Key patterns:
+- Full table scan on `orders` (500M rows)
+- Nested loop join without index
+- Missing WHERE clause predicate pushdown
+
+Expected output:
+- Parser extracts: full scans, join type, cost estimate
+- Model response: add index, rewrite with predicate pushdown, use hash join
+- Optimized SQL rewrite shown in diff view
+- Telemetry shown
+
+Demo question: _"Rewrite this SQL to eliminate the full table scan."_
+
+---
+
+# 10. Inference Backend Strategy
+
+```
+INFERENCE_BACKEND=auto (default)
+
+Auto-selection logic (inference/factory.py):
+  1. If TRT_ENGINE_PATH env var set → LocalTRTBackend
+  2. Else → NvidiaAPIBackend (uses NVIDIA_API_KEY)
+
+For demo without GPU:
+  - Set NVIDIA_API_KEY
+  - Backend shows "nvidia_api" in telemetry
+  - Latency still measured and displayed
+
+For demo with GPU:
+  - Build engine: scripts/build_trt_engine.py
+  - Set TRT_ENGINE_PATH=/path/to/mistral.engine
+  - Backend shows "local_trt" in telemetry — strongest demo story
+```
+
+---
+
+# 11. GPU Telemetry Display
+
+Capture and display in UI:
+- Backend in use (`local_trt` / `nvidia_api`)
+- Inference latency (ms)
+- Tokens generated
+- Tokens/second throughput
+- Model name / engine path
+
+Optionally (if pynvml available):
+- VRAM used (MB)
+- GPU utilization %
+
+---
+
+# 12. Streamlit UI Layout
+
+```
+st.title("DataBolt Edge — On-Device AI Debugger")
+
+[Tab 1: Analyze]
+  - radio: Spark | Airflow | SQL
+  - text_area: paste log / SQL
+  - text_input: question
+  - button: Analyze →
+  - output: parsed summary (expander) + model response + SQL diff
+  - metrics: backend, latency_ms, tokens
+
+[Tab 2: History]
+  - dataframe: all analyses from DuckDB
+  - click row → re-display detail
+
+[Tab 3: Quantization Pipeline]
+  - show conversion/report.py output (FP16 vs INT8 benchmark table)
+  - button: Run benchmark (if model present)
+```
+
+---
+
+# 13. Run Commands
+
+All commands must be run from the **repo root** (`/workspaces/Mistral-Hackathon-NYC`).
+
+```bash
+# Terminal 1 — start backend
+PYTHONPATH=DataBolt-Edge uv run --extra agentops \
+  uvicorn api.server:app --reload --port 8001 --host 0.0.0.0
+
+# Terminal 2 — start UI  (path is relative to repo root)
+PYTHONPATH=DataBolt-Edge uv run --extra agentops \
+  streamlit run DataBolt-Edge/ui/app.py \
+  --server.port 8504 --server.headless true --server.address 0.0.0.0
+
+# Optional: run full quantization pipeline (requires model weights)
+PYTHONPATH=DataBolt-Edge uv run --extra agentops python \
+  DataBolt-Edge/scripts/run_quantization_pipeline.py \
+  --model-path models/mistral-7b --output-dir models/quantized
+
+# Run all unit tests  (from repo root, not DataBolt-Edge subdir)
+PYTHONPATH=DataBolt-Edge uv run --extra agentops make -C DataBolt-Edge test-all
+```
+
+---
+
+# 14. Verification Checklist
+
+- [ ] `make test-all` passes (parsers + conversion + NVIDIA + HF)
+- [ ] Backend starts: `curl http://localhost:8001/health` → 200
+- [ ] Scenario 1: Spark OOM log → model returns memory fix recommendation
+- [ ] Scenario 2: Airflow log → model identifies dag_id, task_id, fix
+- [ ] Scenario 3: SQL plan → optimized rewrite shown in diff view
+- [ ] Telemetry row shows: backend, latency_ms, tokens
+- [ ] History tab shows all 3 analyses in DuckDB
+- [ ] Works with NVIDIA API key (no GPU) → demo fallback confirmed
+
+---
+
+# 15. Critical Files Map
+
+| File | Role |
+|------|------|
+| `parsers/spark.py` | Spark error extraction — built |
+| `parsers/airflow.py` | Airflow traceback extraction — built |
+| `parsers/sql_plan.py` | SQL EXPLAIN cost analysis — built |
+| `inference/factory.py` | TRT vs API auto-selection — built |
+| `inference/nvidia_api_backend.py` | NVIDIA hosted inference — built |
+| `inference/local_trt_backend.py` | Local GPU inference — built |
+| `conversion/pipeline.py` | ONNX quantization orchestrator — built |
+| `nvidia_api_management/client.py` | Resilient HTTP client — built |
+| `api/server.py` | **FastAPI backend — TO BUILD** |
+| `api/context_store.py` | **DuckDB store — TO BUILD** |
+| `api/prompt_builder.py` | **Prompt construction — TO BUILD** |
+| `api/telemetry.py` | **Inference telemetry — TO BUILD** |
+| `ui/app.py` | **Streamlit UI — TO BUILD** |
+| `demo_data/spark_oom.log` | **Sample Spark log — TO BUILD** |
+| `demo_data/airflow_failure.log` | **Sample Airflow log — TO BUILD** |
+| `demo_data/sql_bad_plan.txt` | **Sample SQL plan — TO BUILD** |
+
+---
+
+# 16. Winning Alignment
+
+| Track | How DataBolt-Edge Qualifies |
+|-------|----------------------------|
+| NVIDIA On-Device | Local TensorRT inference, GPU telemetry, quantized Mistral |
+| Mistral (Global) | Mistral model via NVIDIA API + local TRT; structured reasoning |
+| Data Engineering | Spark/Airflow/SQL parsers solving real DE problems |
+| Privacy/Security | Zero cloud inference during demo — "no data left this machine" |
+
+---
+
+# 17. Post-Hackathon Roadmap
+
+1. VSCode extension — analyze currently-open SQL/notebook
+2. Databricks notebook plugin — inline Spark log analysis
+3. CLI tool — `databolt analyze spark_driver.log`
+4. CI linting mode — flag slow queries in PRs
+5. Fine-tune on operator-specific failure patterns
+6. SparkListener integration for live job monitoring

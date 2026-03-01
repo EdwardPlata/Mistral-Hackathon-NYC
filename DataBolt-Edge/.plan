@@ -1,0 +1,311 @@
+# DataBolt Edge - Development Plan
+
+## Project Overview
+**Goal:** Build an on-device AI assistant that debugs Spark, Airflow, and SQL issues using a quantized Mistral model running locally via TensorRT.
+
+**Target:** NVIDIA on-device track + Mistral integration + data analytics
+
+---
+
+## Phase 1: Core Infrastructure (Day 1, 9am-1pm)
+### Repository & Environment Setup
+- [x] Create project structure
+- [ ] Set up Python virtual environment (uv sync)
+- [ ] Create Dockerfiles (backend + Triton)
+- [ ] Initialize pyproject.toml dependencies
+  - mistralai, transformers, optimum
+  - tensorrt, triton (NVIDIA)
+  - fastapi, uvicorn
+  - streamlit
+  - pytest, ruff
+
+### Model Export Pipeline
+- [x] Download Mistral-7B-Instruct weights (HuggingFace) — scripts/download_model.py
+- [x] Implement ONNX export script — scripts/export_to_onnx.py
+  - [x] Test with sample inputs (GPU hardware required; skipped in Codespace)
+  - [x] Verify ONNX model loads (onnx.checker.check_model included in script)
+- [x] Document export process in README
+- [x] Inference abstraction layer (inference/) — auto-selects NvidiaAPIBackend or LocalTRTBackend
+  - [x] INFERENCE_BACKEND=auto: local_trt if engine exists, else nvidia_api
+  - [x] End-to-end test: InferenceRequest → NvidiaAPIBackend → InferenceResponse ✅
+
+---
+
+## Phase 2: Model Quantization & Inference (Day 1, 1pm-5pm)
+### TensorRT-LLM Engine Build
+- [x] Install TensorRT-LLM dependencies (onnx, onnxruntime, onnxconverter-common — pyproject.toml)
+- [x] Create quantization script (INT8 target) — conversion/quantize_onnx.py
+  - [x] FP16 conversion (onnxconverter-common float16)
+  - [x] Dynamic INT8 (onnxruntime quantize_dynamic — no calibration needed)
+  - [x] Static INT8 with calibration data (onnxruntime quantize_static)
+  - [x] Calibration dataset — conversion/calibrate.py (DataBoltCalibrationDataReader)
+- [x] Benchmark inference latency — conversion/benchmark.py
+  - [x] FP16 baseline
+  - [x] INT8 quantized
+  - [x] Log results (tokens/sec, ms/query, p50/p95/p99)
+- [x] End-to-end pipeline orchestrator — conversion/pipeline.py (QuantizationPipeline)
+- [x] Report generator — conversion/report.py (JSON + Markdown comparison table)
+- [x] CLI — scripts/run_quantization_pipeline.py (full pipeline or single-step)
+- [x] Unit tests — tests/test_conversion.py (49 tests, all passing)
+- [x] Streamlit tab — Tab 9 🔧 Model Pipeline
+
+### Inference Server Setup
+- [ ] Option A: TensorRT Python API wrapper
+- [ ] Option B: Triton inference server
+- [ ] Create `/infer` API endpoint
+- [ ] Test with sample queries
+
+---
+
+## Phase 3: Log Parsers (Day 1, 3pm-7pm)
+### Spark Log Parser
+- [ ] Create `parsers/spark.py`
+- [ ] Implement regex patterns for:
+  - Exception detection
+  - Stage/task IDs
+  - Error stack traces
+  - OutOfMemoryError, Task failed, etc.
+- [ ] Unit tests with sample logs
+- [ ] Store parsed data structure
+
+### Airflow Log Parser
+- [ ] Create `parsers/airflow.py`
+- [ ] Traverse `AIRFLOW_HOME/logs/` structure
+- [ ] Extract ERROR lines and Python tracebacks
+- [ ] Parse task metadata (dag_id, task_id, execution_date)
+- [ ] Unit tests
+
+### SQL Plan Analyzer
+- [ ] Create `parsers/sql_plan.py`
+- [ ] Support JSON format (MySQL, Spark)
+- [ ] Parse text EXPLAIN output
+- [ ] Identify costly operators:
+  - Full table scans
+  - Cartesian products
+  - Large joins
+- [ ] Extract cost estimates
+- [ ] Unit tests
+
+---
+
+## Phase 4: Backend Integration (Day 1, 5pm-9pm)
+### FastAPI Backend
+- [ ] Create `api/server.py`
+- [ ] Endpoints:
+  - `POST /upload` - accept log files
+  - `POST /parse` - trigger parsing
+  - `POST /query` - ask model questions
+  - `GET /results/{id}` - retrieve analysis
+- [ ] Integrate parsers with endpoints
+- [ ] Connect to inference server
+
+### Context Store
+- [ ] Set up DuckDB (local/lightweight)
+- [ ] Schema design:
+  - `spark_errors` table
+  - `airflow_failures` table
+  - `sql_plans` table
+  - `queries` table (cache)
+- [ ] CRUD operations
+- [ ] Context injection for LLM prompts
+
+---
+
+## Phase 5: Frontend MVP (Day 1, 7pm-11pm)
+### Streamlit UI
+- [ ] Create `ui/app.py`
+- [ ] Components:
+  - File uploader (drag & drop)
+  - Log type selector (Spark/Airflow/SQL)
+  - Parsed errors display
+  - Question input box
+  - Model response area
+  - Highlighted log excerpts
+- [ ] Connect to backend API
+- [ ] Basic error handling
+- [ ] Styling and layout
+
+### End-to-End Test
+- [ ] Prepare sample logs (Spark error, Airflow failure, SQL plan)
+- [ ] Run full pipeline:
+  1. Upload → Parse → Store
+  2. Ask question → Inference → Display
+- [ ] Document any issues
+- [ ] Debug and fix critical bugs
+
+---
+
+## Phase 6: Optimization (Day 2, 9am-1pm)
+### Inference Performance
+- [ ] Profile inference bottlenecks
+- [ ] Try FP8 quantization (if supported)
+- [ ] Implement batching for multiple queries
+- [ ] Measure latency improvements
+- [ ] Document trade-offs
+
+### Parser Enhancements
+- [ ] Add more error patterns
+- [ ] Improve context extraction
+- [ ] Smart snippet selection (most relevant lines)
+- [ ] Deduplication of similar errors
+
+### Context Store
+- [ ] Add caching layer
+- [ ] Optimize queries
+- [ ] Enable multi-step conversations
+- [ ] Store conversation history
+
+---
+
+## Phase 7: Testing & CI (Day 2, 3pm-5pm)
+### Unit Tests
+- [ ] Parser tests (all three types)
+- [ ] API endpoint tests
+- [ ] Model loading test
+- [ ] Database operations tests
+- [ ] Achieve >80% coverage
+
+### Integration Tests
+- [ ] Docker Compose setup
+- [ ] End-to-end API test
+- [ ] Performance benchmarks
+- [ ] Load testing (if time permits)
+
+### CI/CD Pipeline
+- [ ] GitHub Actions workflow
+- [ ] Lint (ruff check)
+- [ ] Test (pytest)
+- [ ] Build Docker images
+- [ ] Push to registry (optional)
+
+---
+
+## Phase 8: Polish & Demo Prep (Day 2, 5pm-7pm)
+### Documentation
+- [ ] Update main README with setup instructions
+- [ ] Create QUICKSTART.md
+- [ ] Add architecture diagram
+- [ ] Document API endpoints
+- [ ] Add example queries
+
+### Demo Materials
+- [ ] Prepare 3 demo scenarios:
+  1. Spark OOM error analysis
+  2. Airflow DAG failure debugging
+  3. SQL query optimization
+- [ ] Create slides (5-7 slides)
+- [ ] Record demo video (optional)
+- [ ] Practice pitch (2-3 minutes)
+
+### Final Checks
+- [ ] Verify Docker deployment works
+- [ ] Test on clean environment
+- [ ] Check all links in README
+- [ ] Ensure code is commented
+- [ ] Git commit history is clean
+
+---
+
+## Technical Decisions Log
+
+### Model Selection
+- **Decision:** Mistral-7B-Instruct-v0.1
+- **Rationale:** Good balance of quality and size for local inference
+- **Alternatives considered:** Mistral-3B (smaller), Mixtral-8x7B (too large)
+
+### Quantization Strategy
+- **Decision:** INT8 quantization as primary target
+- **Rationale:** ~2x speedup with minimal quality loss
+- **Fallback:** FP16 for higher-end GPUs
+
+### UI Framework
+- **Decision:** Streamlit for MVP
+- **Rationale:** Rapid development, Python-native
+- **Future:** Consider Tauri for desktop app
+
+### Database
+- **Decision:** DuckDB (embedded)
+- **Rationale:** Lightweight, SQL support, no server required
+- **Alternatives:** SQLite, PostgreSQL (too heavy for local use)
+
+### Deployment
+- **Decision:** Docker Compose for local deployment
+- **Rationale:** Easy GPU access, reproducible environment
+- **Future:** K8s for multi-node (if needed)
+
+---
+
+## Dependencies & Prerequisites
+
+### Hardware Requirements
+- NVIDIA GPU (RTX 3080+ recommended)
+- CUDA 11.8+ / 12.x
+- 16+ GB GPU RAM (for 7B model)
+- 32+ GB system RAM
+- 50+ GB disk space
+
+### Software Requirements
+- Python 3.11+
+- Docker with NVIDIA runtime
+- CUDA Toolkit
+- TensorRT-LLM
+- UV package manager
+
+### API Keys & Access
+- Hugging Face token (for model download)
+- W&B API key (optional, for experiment tracking)
+
+---
+
+## Risk Assessment
+
+### High Risk
+- **TensorRT-LLM installation complexity** → Mitigation: Use pre-built Docker images
+- **Model quantization calibration** → Mitigation: Start with pre-calibrated examples
+- **Performance on lower-end GPUs** → Mitigation: Have FP16 and smaller model fallbacks
+
+### Medium Risk
+- **Log parsing accuracy** → Mitigation: Extensive unit tests, iterative refinement
+- **Context window limitations** → Mitigation: Smart chunking and summarization
+- **Docker GPU access issues** → Mitigation: Test early, have troubleshooting guide
+
+### Low Risk
+- **Streamlit UI responsiveness** → Mitigation: Add loading indicators
+- **DuckDB schema changes** → Mitigation: Keep schema simple and documented
+
+---
+
+## Success Criteria
+
+### MVP (Minimum Viable Product)
+- ✅ Load quantized Mistral model locally
+- ✅ Parse at least one type of log (Spark or Airflow)
+- ✅ Answer basic questions about logs
+- ✅ Working UI with upload and query
+- ✅ Runs in Docker on local machine
+
+### Stretch Goals
+- Parse all three log types (Spark, Airflow, SQL)
+- INT8 quantization working with benchmarks
+- Multi-turn conversations with context
+- CI pipeline with tests
+- Polish UI with syntax highlighting
+
+### Demo Quality
+- Clear value proposition communicated
+- Live demo without crashes
+- Performance metrics shown
+- Architecture explained
+- Code available on GitHub
+
+---
+
+## Next Actions (Immediate)
+1. ✅ Create project structure
+2. Set up Python environment (`uv sync`)
+3. Download Mistral model weights
+4. Create initial parser stub files
+5. Set up basic FastAPI skeleton
+6. Initialize Docker configuration
+
+**Last Updated:** 2026-02-28

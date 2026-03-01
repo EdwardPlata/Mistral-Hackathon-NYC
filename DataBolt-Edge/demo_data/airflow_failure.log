@@ -1,0 +1,17 @@
+[2024-02-28 09:14:58,001] {taskinstance.py:1350} INFO - Dependencies all met for <TaskInstance: data_pipeline_daily.transform_sales 2024-02-28T09:00:00+00:00 [queued]>
+[2024-02-28 09:14:58,012] {taskinstance.py:1410} INFO - Starting attempt 1 of 3
+[2024-02-28 09:14:58,022] {taskinstance.py:1481} INFO - Executing <Task(PythonOperator): transform_sales> on 2024-02-28T09:00:00+00:00
+dag_id=data_pipeline_daily, task_id=transform_sales, execution_date=2024-02-28T09:00:00+00:00, start_date=2024-02-28T09:14:58+00:00
+[2024-02-28 09:14:58,450] {python.py:177} INFO - Done. Returned value was: None
+[2024-02-28 09:15:03,412] {taskinstance.py:1482} ERROR - Failed to execute task
+Traceback (most recent call last):
+  File "/opt/airflow/dags/data_pipeline_daily.py", line 47, in transform_sales
+    df = pd.read_csv('/data/input/sales_2024-02-28.csv')
+  File "/usr/local/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 912, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File "/usr/local/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 577, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+FileNotFoundError: [Errno 2] No such file or directory: '/data/input/sales_2024-02-28.csv'
+[2024-02-28 09:15:03,415] {taskinstance.py:1492} ERROR - Task failed with exception
+[2024-02-28 09:15:03,416] {taskinstance.py:1501} ERROR - Marking task as FAILED. dag_id=data_pipeline_daily, task_id=transform_sales, execution_date=2024-02-28T09:00:00+00:00, start_date=2024-02-28T09:14:58+00:00, end_date=2024-02-28T09:15:03+00:00
+[2024-02-28 09:15:03,417] {local_task_job.py:156} ERROR - Task exited with return code 1

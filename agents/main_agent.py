@@ -60,7 +60,14 @@ def run_agent(prompt: str) -> str:
     # Import here to avoid hard dependency if mistralai is not installed
     from mistralai import Mistral  # noqa: PLC0415
 
-    client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "MISTRAL_API_KEY is not set. Please set it via environment variable "
+            "or .env file. See docs/CREDENTIALS.md for setup instructions."
+        )
+
+    client = Mistral(api_key=api_key)
     model = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
     max_tokens = int(os.getenv("MAX_TOKENS", "2048"))
     temperature = float(os.getenv("TEMPERATURE", "0.6"))

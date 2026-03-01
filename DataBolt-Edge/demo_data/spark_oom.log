@@ -1,0 +1,28 @@
+26/02/28 14:32:55 INFO  SparkContext: Running Spark version 3.4.1
+26/02/28 14:32:55 INFO  ResourceUtils: ==============================================================
+26/02/28 14:32:56 INFO  SparkUI: Bound SparkUI to 0.0.0.0, and started at http://10.0.0.3:4040
+26/02/28 14:32:57 INFO  DAGScheduler: Got job 0 (collect at DataPipeline.scala:112) with 8 output partitions
+26/02/28 14:33:00 INFO  TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0, 10.0.0.4, executor 1, partition 0)
+26/02/28 14:33:01 INFO  TaskSetManager: Starting task 1.0 in stage 0.0 (TID 1, 10.0.0.5, executor 2, partition 1)
+26/02/28 14:33:45 ERROR Executor: Exception in task 3.0 in stage 12.0 (TID 847)
+java.lang.OutOfMemoryError: GC overhead limit exceeded
+	at scala.collection.mutable.HashMap.resize(HashMap.scala:145)
+	at scala.collection.mutable.HashMap.addEntry(HashMap.scala:129)
+	at scala.collection.mutable.HashMap.update(HashMap.scala:109)
+	at org.apache.spark.shuffle.sort.SortShuffleWriter.write(SortShuffleWriter.scala:67)
+	at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:96)
+	at org.apache.spark.scheduler.Task.run(Task.scala:136)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$3(Executor.scala:548)
+26/02/28 14:33:45 WARN  TaskSetManager: Lost task 3.0 in stage 12.0 (TID 847) on 10.0.0.5, executor 2: java.lang.OutOfMemoryError (GC overhead limit exceeded) [duplicate 4]
+26/02/28 14:33:45 ERROR TaskSchedulerImpl: Lost executor 2 on 10.0.0.5: Remote RPC client disassociated. Likely due to containers exceeding memory limits or network issues. Check driver logs for WARN.
+26/02/28 14:33:45 WARN  ReliableRDDCheckpointData: Error during RDD checkpointing
+java.io.IOException: Failed to rename /tmp/spark-checkpoints/rdd-14 to /tmp/spark-checkpoints/rdd-14-final
+26/02/28 14:33:46 ERROR DAGScheduler: Task 3 in stage 12.0 failed 4 times; aborting job
+26/02/28 14:33:46 ERROR SparkContext: Error initializing SparkContext.
+org.apache.spark.SparkException: Job aborted due to stage failure: Task 3 in stage 12.0 failed 4 times, most recent failure: Lost task 3.0 in stage 12.0 (TID 847) (10.0.0.5 executor 2): java.lang.OutOfMemoryError: GC overhead limit exceeded
+	at org.apache.spark.scheduler.DAGScheduler.failJobAndIndependentStages(DAGScheduler.scala:2454)
+	at org.apache.spark.scheduler.DAGScheduler.$anonfun$abortStage$2(DAGScheduler.scala:2403)
+26/02/28 14:33:46 INFO  SparkUI: Stopped Spark web UI at http://10.0.0.3:4040
+26/02/28 14:33:46 INFO  MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+26/02/28 14:33:46 INFO  MemoryStore: MemoryStore cleared
+26/02/28 14:33:46 INFO  BlockManager: BlockManager stopped

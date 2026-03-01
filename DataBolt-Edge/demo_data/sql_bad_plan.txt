@@ -1,0 +1,9 @@
+-> Table scan on orders  (cost=521432.50 rows=4983201)
+-> Hash join (cost=1043215.00 rows=4983201)
+    -> Index lookup on customers using PRIMARY (customer_id=o.customer_id)  (cost=12450.00 rows=124500)
+    -> Table scan on order_items  (cost=2987451.00 rows=28932847)
+        Filter: (oi.order_id = o.order_id)  -- no index on order_items.order_id
+-> Table scan on products  (cost=8932.00 rows=89320)
+    Filter: (p.category = 'electronics')  -- no index on products.category
+-> Sort: o.created_at DESC  (cost=1532847.00 rows=4983201)
+    -- possible_keys: NULL  (no index on orders.created_at)

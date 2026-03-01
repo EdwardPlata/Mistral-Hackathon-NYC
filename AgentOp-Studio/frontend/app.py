@@ -5,6 +5,8 @@ Pages (via sidebar radio):
     Run Agent       — Submit a prompt and view the result
     Run Detail      — Browse messages and tool calls for a run
     Replay & Diff   — Replay a run with param overrides, view diff
+    Evaluations     — Browse and chart logged eval metrics
+    W&B Training    — Launch Mistral training runs in Weights & Biases
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ def _load_runs() -> pd.DataFrame:
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Run Agent", "Run Detail", "Replay & Diff", "Evaluations"],
+    ["Dashboard", "Run Agent", "Run Detail", "Replay & Diff", "Evaluations", "W&B Training", "Databricks"],
 )
 
 # ---------------------------------------------------------------------------
@@ -396,3 +398,410 @@ elif page == "Replay & Diff":
 
                 except Exception as exc:
                     st.error(f"Replay failed: {exc}")
+
+# ---------------------------------------------------------------------------
+# Page: W&B Training
+# ---------------------------------------------------------------------------
+
+elif page == "W&B Training":
+    st.title("W&B Training — Mistral Agent Analysis")
+    st.markdown(
+        "Launch a **Mistral fine-tuning simulation** in [Weights & Biases](https://wandb.ai). "
+        "The run fetches a HuggingFace dataset sample, logs training metrics (loss, "
+        "perplexity, token accuracy), uploads a dataset artifact, and includes "
+        "agent-analysis from existing AgentOps runs."
+    )
+
+    # -- W&B connection status banner --
+    st.subheader("Connection Status")
+    try:
+        status = _get("/wandb/status")
+        if status.get("connected"):
+            st.success(
+                f"Connected — project **{status['project']}** "
+                f"/ entity **{status.get('entity', '—')}** "
+                f"(key: `{status['key_prefix']}`)"
+            )
+        else:
+            st.error(f"Not connected: {status.get('reason', 'unknown')}")
+            st.info(
+                "Set `WANDB_API_KEY` in your `.env` file or Codespace secrets, "
+                "then restart the backend."
+            )
+    except Exception as exc:
+        st.warning(f"Could not reach backend to check W&B status: {exc}")
+
+    st.divider()
+
+    # -- Training run configuration form --
+    st.subheader("Launch Training Run")
+    with st.form("wandb_training_form"):
+        col_l, col_r = st.columns(2)
+
+        with col_l:
+            model_options = [
+                "mistral-7b-instruct-v0.2",
+                "mistral-7b-v0.3",
+                "mixtral-8x7b-instruct-v0.1",
+                "mistral-small-latest",
+            ]
+            model_name = st.selectbox("Model", model_options)
+
+            dataset_options = [
+                "tatsu-lab/alpaca",
+                "HuggingFaceH4/ultrachat_200k",
+                "databricks/databricks-dolly-15k",
+                "openai/gsm8k",
+            ]
+            dataset_name = st.selectbox("HuggingFace Dataset", dataset_options)
+
+        with col_r:
+            num_steps = st.slider("Training Steps", min_value=10, max_value=200, value=50, step=10)
+            sample_size = st.slider("HF Sample Size", min_value=5, max_value=50, value=20, step=5)
+
+        run_name = st.text_input(
+            "Run Name (optional)",
+            placeholder="Leave blank for auto-generated name",
+        )
+
+        launch = st.form_submit_button("Launch Training Run", type="primary")
+
+    if launch:
+        payload = {
+            "model_name": model_name,
+            "dataset_name": dataset_name,
+            "num_steps": num_steps,
+            "sample_size": sample_size,
+        }
+        if run_name.strip():
+            payload["run_name"] = run_name.strip()
+
+        with st.spinner(f"Running {num_steps} training steps and logging to W&B …"):
+            try:
+                result = _post("/wandb/training-run", payload)
+
+                st.success("Training run complete!")
+
+                # Metrics grid
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Final Loss", f"{result.get('final_train_loss', 0):.4f}")
+                m2.metric("Perplexity", f"{result.get('final_perplexity', 0):.2f}")
+                m3.metric("Token Accuracy", f"{result.get('final_token_accuracy', 0):.1%}")
+                m4.metric("HF Samples", result.get("dataset_samples", 0))
+
+                # W&B run link
+                run_url = result.get("run_url")
+                if run_url:
+                    st.markdown(f"### View in W&B\n[{run_url}]({run_url})")
+                else:
+                    st.info("Run complete (URL not available — check W&B dashboard).")
+
+            except Exception as exc:
+                st.error(f"Training run failed: {exc}")
+
+    # -- Instructions for standalone script --
+    st.divider()
+    st.subheader("Run via CLI")
+    st.markdown(
+        "You can also run the training demo directly from the terminal "
+        "without the backend:"
+    )
+    st.code(
+        "PYTHONPATH=AgentOp-Studio python AgentOp-Studio/scripts/mistral_training_demo.py",
+        language="bash",
+    )
+    st.markdown(
+        "Optional env vars: `HF_DATASET`, `HF_SAMPLE_SIZE`, `TRAINING_STEPS`, "
+        "`WANDB_PROJECT`"
+    )
+
+# ---------------------------------------------------------------------------
+# Page: Databricks
+# ---------------------------------------------------------------------------
+
+elif page == "Databricks":
+    st.title("Databricks — Job Monitor & Debug Agent")
+
+    # Load workflow data once
+    try:
+        wf_data = _get("/databricks/workflow")
+    except Exception as exc:
+        st.error(f"Could not reach backend: {exc}")
+        wf_data = {}
+
+    failed_jobs = wf_data.get("failed_jobs", [])
+    predefined = wf_data.get("predefined_errors", [])
+    pipeline_data = wf_data.get("pipeline", {})
+
+    # ── SECTION 1: Failed Jobs ─────────────────────────────────────────────
+    st.subheader("Failed Jobs")
+
+    if not failed_jobs:
+        st.info("No failed jobs found.")
+    else:
+        # One expander per failed job
+        for job in failed_jobs:
+            severity_icon = "🔴" if "OOM" in job.get("category", "") else "🟠"
+            header = (
+                f"{severity_icon} **{job['job_name']}** › `{job['task_key']}`  "
+                f"— {job.get('category', 'Error')}  "
+                f"| {job.get('started_at', '')[:16].replace('T', ' ')} UTC"
+            )
+            with st.expander(header, expanded=False):
+                st.error(job.get("error_message", ""))
+                col_a, col_b, col_c = st.columns([2, 2, 1])
+                col_a.markdown(f"**Run ID:** `{job['run_id']}`")
+                col_b.markdown(f"**Duration:** {job.get('duration_seconds', 0)}s")
+                run_url = job.get("run_url", "")
+                col_c.markdown(f"[View in Databricks ↗]({run_url})" if run_url else "")
+
+                # Pre-fill investigation from this job
+                if st.button(
+                    "Investigate this error",
+                    key=f"inv_{job['run_id']}",
+                    type="secondary",
+                ):
+                    st.session_state["db_error_msg"] = job["error_message"]
+                    st.session_state["db_task_key"] = job["task_key"]
+                    st.session_state["db_job_name"] = job["job_name"]
+                    st.session_state["db_category"] = job.get("category", "")
+                    st.rerun()
+
+    st.divider()
+
+    # ── SECTION 2: DLT Pipeline DAG (visual) ──────────────────────────────
+    with st.expander("Pipeline DAG — Medallion Architecture", expanded=False):
+        tables = pipeline_data.get("tables", [])
+        edges = pipeline_data.get("dag_edges", [])
+
+        if tables and edges:
+            # Build Sankey diagram
+            all_names = list({t["name"] for t in tables})
+            label_to_idx = {n: i for i, n in enumerate(all_names)}
+
+            layer_colors = {
+                "bronze": "#cd7f32",
+                "silver": "#a8a9ad",
+                "gold": "#ffd700",
+                "features": "#6495ed",
+            }
+            node_colors = [
+                layer_colors.get(
+                    next((t["layer"] for t in tables if t["name"] == n), ""), "#888"
+                )
+                for n in all_names
+            ]
+
+            sources = [label_to_idx[e["source"]] for e in edges if e["source"] in label_to_idx]
+            targets_idx = [label_to_idx[e["target"]] for e in edges if e["target"] in label_to_idx]
+
+            fig_dag = px.scatter(title="")  # placeholder — build sankey manually
+            import plotly.graph_objects as go  # noqa: PLC0415
+
+            fig_sankey = go.Figure(
+                go.Sankey(
+                    node=dict(
+                        label=all_names,
+                        color=node_colors,
+                        pad=20,
+                        thickness=20,
+                    ),
+                    link=dict(
+                        source=sources,
+                        target=targets_idx,
+                        value=[1] * len(sources),
+                    ),
+                )
+            )
+            fig_sankey.update_layout(
+                title_text="DLT Table Lineage (Bronze → Silver → Gold → Features)",
+                height=320,
+                margin=dict(l=20, r=20, t=40, b=10),
+            )
+            st.plotly_chart(fig_sankey, use_container_width=True)
+
+            # Table summary
+            layer_counts = pipeline_data.get("layers", {})
+            cols = st.columns(len(layer_counts) or 1)
+            for i, (layer, names) in enumerate(sorted(layer_counts.items())):
+                cols[i].metric(layer.title(), len(names))
+            st.caption(
+                f"Total tables: {pipeline_data.get('total_tables', 0)}  |  "
+                f"Quality rules: {pipeline_data.get('quality_rule_count', 0)}"
+            )
+        else:
+            st.info("Pipeline data unavailable.")
+
+    st.divider()
+
+    # ── SECTION 3: Investigate Error ──────────────────────────────────────
+    st.subheader("Investigate Error with Mistral")
+
+    # Predefined error quick-select
+    st.markdown("**Quick select a predefined error category:**")
+    pred_cols = st.columns(len(predefined) or 1)
+    for i, err in enumerate(predefined):
+        if pred_cols[i].button(
+            f"{err['icon']} {err['label']}",
+            key=f"pred_{err['id']}",
+            use_container_width=True,
+        ):
+            st.session_state["db_error_msg"] = err["prompt"]
+            st.session_state["db_task_key"] = ""
+            st.session_state["db_job_name"] = ""
+            st.session_state["db_category"] = err["label"]
+            st.rerun()
+
+    st.markdown("**— or describe the error —**")
+
+    with st.form("db_investigate_form"):
+        error_msg = st.text_area(
+            "Error message / description",
+            value=st.session_state.get("db_error_msg", ""),
+            height=100,
+            placeholder="Paste the full error message here, or click a quick-select above…",
+        )
+        col_l, col_r = st.columns(2)
+        task_key = col_l.text_input(
+            "Failed task key",
+            value=st.session_state.get("db_task_key", ""),
+            placeholder="e.g. validate_output",
+        )
+        job_name_input = col_r.text_input(
+            "Job name",
+            value=st.session_state.get("db_job_name", ""),
+            placeholder="e.g. NYC Taxi Workflow [dev]",
+        )
+        extra_ctx = st.text_area(
+            "Additional context (optional)",
+            height=60,
+            placeholder="Any extra info: cluster config, data volume, recent changes…",
+        )
+        include_code = st.checkbox("Include DLT pipeline code as context", value=True)
+
+        submitted = st.form_submit_button("Investigate with Mistral", type="primary")
+
+    if submitted and error_msg.strip():
+        with st.spinner("Mistral is analyzing the error…"):
+            try:
+                result = _post(
+                    "/databricks/investigate",
+                    {
+                        "error_message": error_msg,
+                        "task_key": task_key,
+                        "job_name": job_name_input,
+                        "extra_context": extra_ctx,
+                        "include_pipeline_code": include_code,
+                    },
+                )
+                st.session_state["db_last_analysis"] = result
+                st.session_state["db_last_error"] = error_msg
+                st.session_state["db_last_job"] = job_name_input
+                st.session_state["db_last_task"] = task_key
+                st.session_state["db_last_category"] = st.session_state.get("db_category", "other")
+            except Exception as exc:
+                st.error(f"Investigation failed: {exc}")
+                result = None
+
+    # ── SECTION 4: Analysis Output ─────────────────────────────────────────
+    analysis = st.session_state.get("db_last_analysis")
+    if analysis:
+        st.divider()
+        st.subheader("Mistral Analysis")
+
+        if analysis.get("error"):
+            st.error(f"Agent error: {analysis['error']}")
+        else:
+            sev = analysis.get("severity", "unknown")
+            sev_color = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(sev, "⚪")
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Severity", f"{sev_color} {sev.title()}")
+            c2.metric("Category", analysis.get("category", "—").replace("_", " ").title())
+            c3.metric("Confidence", f"{analysis.get('confidence', 0):.0%}")
+
+            st.markdown("**Root Cause**")
+            st.info(analysis.get("root_cause", "—"))
+
+            st.markdown("**Recommended Fix**")
+            st.success(analysis.get("recommended_fix", "—"))
+
+            fix_code = analysis.get("fix_code", "").strip()
+            if fix_code:
+                st.markdown("**Code Change**")
+                lang = "sql" if fix_code.strip().upper().startswith("SELECT") else "python"
+                st.code(fix_code, language=lang)
+                fix_loc = analysis.get("fix_location", "")
+                if fix_loc:
+                    st.caption(f"Apply at: `{fix_loc}`")
+
+            prevention = analysis.get("prevention", "").strip()
+            if prevention:
+                with st.expander("Prevention Strategy"):
+                    st.write(prevention)
+
+            st.caption(
+                f"Model: `{analysis.get('model', '—')}` | "
+                f"Tokens: {analysis.get('tokens_used', 0):,}"
+            )
+
+            # Save to Knowledge Base
+            st.divider()
+            col_save, col_wandb = st.columns(2)
+            save_wandb = col_wandb.checkbox("Also log to W&B knowledge base", value=True)
+            if col_save.button("Save to Knowledge Base", type="primary"):
+                try:
+                    kb_result = _post(
+                        "/databricks/knowledge",
+                        {
+                            "error_category": st.session_state.get("db_last_category", "other"),
+                            "error_description": st.session_state.get("db_last_error", ""),
+                            "job_name": st.session_state.get("db_last_job", ""),
+                            "task_key": st.session_state.get("db_last_task", ""),
+                            "analysis": analysis,
+                            "log_to_wandb": save_wandb,
+                        },
+                    )
+                    st.success(f"Saved — KB ID: `{kb_result['kb_id']}`")
+                except Exception as exc:
+                    st.error(f"Save failed: {exc}")
+
+    # ── SECTION 5: Knowledge Base ──────────────────────────────────────────
+    st.divider()
+    st.subheader("Knowledge Base — Error/Fix Library")
+    st.caption(
+        "Saved investigations are stored in DuckDB and uploaded to W&B as dataset artifacts "
+        "for future Mistral fine-tuning."
+    )
+
+    try:
+        kb_entries = _get("/databricks/knowledge")
+    except Exception:
+        kb_entries = []
+
+    if not kb_entries:
+        st.info("No entries yet. Investigate an error and click **Save to Knowledge Base**.")
+    else:
+        kb_df = pd.DataFrame(kb_entries)
+        display_cols = [c for c in ["created_at", "error_category", "job_name", "task_key",
+                                    "root_cause", "confidence", "logged_to_wandb"] if c in kb_df.columns]
+        st.dataframe(
+            kb_df[display_cols].rename(columns={
+                "created_at": "Time", "error_category": "Category",
+                "job_name": "Job", "task_key": "Task",
+                "root_cause": "Root Cause", "confidence": "Confidence",
+                "logged_to_wandb": "W&B",
+            }),
+            use_container_width=True,
+        )
+
+        # Expand a single entry to see full details
+        if len(kb_entries) > 0:
+            kb_ids = [e["kb_id"][:8] + "…" for e in kb_entries]
+            selected_idx = st.selectbox("View full entry", range(len(kb_ids)), format_func=lambda i: kb_ids[i])
+            entry = kb_entries[selected_idx]
+            with st.expander("Full Entry", expanded=True):
+                st.markdown(f"**Root cause:** {entry.get('root_cause', '')}")
+                st.markdown(f"**Recommended fix:** {entry.get('recommended_fix', '')}")
+                if entry.get("fix_code"):
+                    st.code(entry["fix_code"], language="python")

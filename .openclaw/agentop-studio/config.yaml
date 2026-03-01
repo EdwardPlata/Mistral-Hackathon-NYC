@@ -1,0 +1,59 @@
+# OpenClaw Configuration for AgentOp-Studio
+# Agent Observability, Cost Tracking & Replay System
+
+project:
+  name: "AgentOp-Studio"
+  description: "Agent observability platform with cost tracking, replay, and debugging capabilities"
+  root_path: "../../AgentOp-Studio"
+  
+workflow:
+  type: "research-plan-implement"
+  planning_files:
+    task_plan: "task_plan.md"
+    findings: "findings.md"
+    progress: "progress.md"
+
+rules:
+  - name: "2-action-save"
+    description: "After every 2 search/view operations, save findings to files"
+  - name: "read-before-decide"
+    description: "Re-read planning files before major implementation decisions"
+  - name: "3-strike-protocol"
+    description: "Track failed attempts and mutate approach after 3 failures"
+
+focus_areas:
+  - path: "agents"
+    description: "Main agent orchestration and tool definitions"
+  - path: "backend"
+    description: "Cost tracking, database, replay logic, instrumentation"
+  - path: "frontend"
+    description: "Streamlit UI for agent observability"
+  - path: "tests"
+    description: "Test suite for backend components"
+  - path: "infra"
+    description: "Docker and infrastructure configuration"
+
+architecture:
+  components:
+    - "Agent orchestration layer"
+    - "Instrumented agent wrapper"
+    - "Cost tracking system"
+    - "Database persistence"
+    - "Replay engine"
+    - "Streamlit frontend"
+
+dependencies:
+  - "mistralai"
+  - "streamlit"
+  - "pytest"
+  - "agent frameworks"
+
+context_priority:
+  - "agents/main_agent.py"
+  - "backend/instrumented_agent.py"
+  - "backend/costs.py"
+  - "backend/db.py"
+  - "backend/replay.py"
+  - "frontend/app.py"
+  - "README.md"
+  - "PROGRESS.md"

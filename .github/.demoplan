@@ -1,0 +1,305 @@
+# Databolt-Edge
+## Demo Plan — On-Device AI Performance Copilot for Data Engineers
+
+---
+
+# 0. Objective
+
+Build a fully local, on-device AI agent that:
+
+- Runs a quantized Mistral model locally (GPU preferred)
+- Ingests Spark execution plans + SQL queries
+- Performs structured performance analysis
+- Detects Spark anti-patterns
+- Rewrites SQL with optimized alternatives
+- Generates performance diff
+- Displays GPU inference metrics
+- Makes ZERO cloud inference calls
+
+This is not a chatbot.
+This is a secure, local-first Spark optimization copilot.
+
+---
+
+# 1. Demo Narrative (2-Minute Flow)
+
+1. Launch local UI
+2. Paste SQL query
+3. Upload Spark explain JSON
+4. Click "Analyze"
+5. Show:
+   - Execution plan graph
+   - Identified bottlenecks
+   - Optimized SQL rewrite
+   - Performance score
+   - GPU inference stats
+6. Show structured diff
+7. Highlight: "No cloud calls were made"
+
+Closing line:
+"Databolt-Edge enables enterprise-safe AI performance debugging."
+
+---
+
+# 2. MVP Scope
+
+## Required
+
+- Local LLM inference (quantized)
+- Execution plan parser
+- Structured metrics extractor
+- Optimization rule engine
+- LLM reasoning layer
+- SQL rewrite generator
+- Diff engine
+- GPU metrics display
+
+## Not Required
+
+- Fine-tuning
+- CI/CD integration
+- Vector database
+- Authentication system
+- Multi-user mode
+
+---
+
+# 3. Architecture
+
+Layer 1 — Local LLM Runtime
+- llama.cpp (CUDA build) OR
+- TensorRT-LLM
+
+Layer 2 — Agent Core
+- Planner
+- Tool dispatcher
+- Structured reasoning pipeline
+
+Layer 3 — Static Analysis Tools
+- parse_execution_plan
+- detect_join_strategy
+- detect_shuffle_heavy_stages
+- detect_partition_imbalance
+- estimate_runtime_cost
+- sql_optimizer
+
+Layer 4 — UI
+- Streamlit OR Tauri
+- Execution graph visualization
+- Optimization report
+- SQL diff viewer
+- GPU telemetry display
+
+---
+
+# 4. Model Strategy
+
+Use quantized Mistral model:
+
+Option A:
+- mistral-7b-instruct GGUF Q4_K_M
+- Run via llama.cpp (CUDA)
+
+Option B:
+- Mistral small quantized
+- Run via TensorRT-LLM
+
+Target:
+< 6GB VRAM usage
+< 2s inference latency
+
+---
+
+# 5. Tool Contracts
+
+## Tool: parse_execution_plan
+
+Input:
+{
+  "plan_json": object
+}
+
+Output:
+{
+  "stage_count": int,
+  "shuffle_count": int,
+  "join_types": [],
+  "scan_types": [],
+  "partition_count": int
+}
+
+---
+
+## Tool: detect_join_strategy
+
+Input:
+{
+  "join_types": [],
+  "table_sizes": []
+}
+
+Output:
+{
+  "broadcast_opportunity": bool,
+  "join_risk_score": float
+}
+
+---
+
+## Tool: detect_shuffle_heavy_stages
+
+Input:
+{
+  "shuffle_count": int,
+  "stage_durations": []
+}
+
+Output:
+{
+  "shuffle_risk_score": float,
+  "recommendation": str
+}
+
+---
+
+## Tool: sql_optimizer
+
+Input:
+{
+  "original_sql": str,
+  "analysis_summary": {}
+}
+
+Output:
+{
+  "optimized_sql": str,
+  "improvement_explanation": str
+}
+
+---
+
+# 6. Performance Scoring
+
+Define:
+
+performance_score =
+  weighted(
+    shuffle_risk * 0.4,
+    join_risk * 0.3,
+    partition_imbalance * 0.3
+  )
+
+Return:
+
+{
+  "score": float (0-100),
+  "confidence": float,
+  "severity_level": str
+}
+
+---
+
+# 7. Diff Engine
+
+Use structured SQL diff:
+
+- column pruning
+- join rewrite
+- partition hint addition
+- broadcast hint insertion
+
+Display:
+
+- Removed clauses
+- Added hints
+- Reduced column projection
+
+---
+
+# 8. GPU Telemetry Capture
+
+Capture:
+
+- Model load time
+- Inference latency
+- Tokens per second
+- VRAM usage
+- CPU fallback detection
+
+Display in UI.
+
+---
+
+# 9. Local-Only Guarantee
+
+Add enforcement:
+
+- Disable outbound HTTP
+- No cloud API calls
+- Local inference endpoint only
+
+Optional:
+Add firewall check script.
+
+---
+
+# 10. Evaluation Mode
+
+Allow comparison:
+
+- Q4 quantized model
+- Q8 quantized model
+
+Display:
+
+- Latency delta
+- Output stability
+- Memory usage difference
+
+  telemetry.py
+
+---
+
+# 12. Demo Script
+
+1. Open app
+2. Show model loading locally
+3. Paste SQL
+4. Upload execution plan
+5. Run analysis
+6. Show:
+   - Bottlenecks
+   - Rewrite
+   - Diff
+   - GPU metrics
+7. State:
+   "No data left this machine."
+
+---
+
+# 13. Winning Alignment
+
+Technicality:
+- Structured plan parsing
+- On-device inference
+- GPU telemetry
+
+Creativity:
+- Secure AI performance copilot
+
+Usefulness:
+- Real Spark optimization
+
+Track Fit:
+- NVIDIA On-Device
+- Mistral
+
+---
+
+# 14. Post-Hackathon Roadmap
+
+- VSCode extension
+- Databricks notebook plugin
+- CLI integration
+- CI linting tool
+- Fine-tune on optimization dataset
