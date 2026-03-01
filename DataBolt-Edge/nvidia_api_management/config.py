@@ -65,7 +65,7 @@ class NvidiaAPIConfig:
     chat_completions_path: str = "/v1/chat/completions"
     api_key_env_var: str = "NVIDIA_BEARER_TOKEN"
     default_model: str = "mistralai/mistral-large-3-675b-instruct-2512"
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = 120.0
     max_retries: int = 3
     backoff_factor: float = 0.5
     retry_status_codes: tuple[int, ...] = (429, 500, 502, 503, 504)
@@ -82,7 +82,7 @@ class NvidiaAPIConfig:
             default_model=os.getenv(
                 "NVIDIA_API_MODEL", "mistralai/mistral-large-3-675b-instruct-2512"
             ),
-            timeout_seconds=_as_float(os.getenv("NVIDIA_API_TIMEOUT_SECONDS"), 30.0),
+            timeout_seconds=_as_float(os.getenv("NVIDIA_API_TIMEOUT_SECONDS"), 120.0),
             max_retries=_as_int(os.getenv("NVIDIA_API_MAX_RETRIES"), 3),
             backoff_factor=_as_float(os.getenv("NVIDIA_API_BACKOFF_FACTOR"), 0.5),
             retry_status_codes=_parse_status_codes(
